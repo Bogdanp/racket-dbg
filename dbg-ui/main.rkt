@@ -54,19 +54,17 @@
    [memory-use/max (max
                     (state-memory-use/max s)
                     (gc-info-pre-amount i))]
-   [memory-use/time
-    (keep-right
-     (append
-      (state-memory-use/time s)
-      `(,(memory-tick ts amt)))
-     hist)]
+   [memory-use/time (keep-right
+                     (append
+                      (state-memory-use/time s)
+                      `(,(memory-tick ts amt)))
+                     hist)]
    [gc-duration/max (max (state-gc-duration/max s) duration)]
-   [gcs/time
-    (keep-right
-     (append
-      (state-gcs/time s)
-      `(,(gc-tick ts mode amt duration)))
-     hist)]))
+   [gcs/time (keep-right
+              (append
+               (state-gcs/time s)
+               `(,(gc-tick ts mode amt duration)))
+              hist)]))
 
 (define (start-async-handler @state c)
   (thread
@@ -148,6 +146,26 @@
       [else
        (text "No GC data yet.")])))))
 
+(define (custodians-tab c)
+  (define/obs @counts (get-managed-item-counts c))
+  (define (rec-counts counts)
+    (apply
+     vpanel
+     #:alignment '(left top)
+     (for/list ([(kind c) (in-hash counts)])
+       (if (number? c)
+           (labeled (~a kind) (text (~a c)))
+           (labeled "custodians" (apply
+                                  vpanel
+                                  #:style '(auto-hscroll)
+                                  (map rec-counts c)))))))
+  (vpanel
+   (button
+    "Reload"
+    (λ ()
+      (@counts . := . (get-managed-item-counts c))))
+   (dyn-view @counts rec-counts)))
+
 (define (run [host "127.0.0.1"]
              [port 9011])
   (define c
@@ -169,12 +187,13 @@
     #:size '(800 400)
     #:mixin (make-window-mixin c)
     (tabs
-     '("Info" "Charts")
+     '("Info" "Charts" "Custodians")
      (λ (event _choices index)
        (case event
          [(select)
-          (@tab . := . (list-ref '(info charts) index))]))
-     (case-view @tab
+          (@tab . := . (list-ref '(info charts custodians) index))]))
+     (case-view
+      @tab
       [(info)
        (info-tab info)]
 
@@ -185,6 +204,9 @@
           [`(commit-history ,hist)
            (@state . <~ . (λ (s)
                             (struct-copy state s [history hist])))]))]
+
+      [(custodians)
+       (custodians-tab c)]
 
       [else
        (hpanel)])))))
