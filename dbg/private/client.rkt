@@ -5,6 +5,7 @@
          "common.rkt")
 
 (provide
+ current-client
  client?
  connect
  disconnect
@@ -14,6 +15,9 @@
  get-info
  get-memory-use
  get-managed-item-counts)
+
+(define current-client
+  (make-parameter #f))
 
 (struct client (async-ch manager-thd))
 
@@ -103,32 +107,47 @@
                   (loop seq (remq cmd cmds))))))))))))
   (client async-ch manager-thd))
 
-(define (send c cmd)
+(define (do-send c cmd)
   (define thd (client-manager-thd c))
   (define res-ch (make-channel))
-  (nack-guard-evt
-   (λ (nack-evt)
-     (begin0 res-ch
-       (thread-resume thd)
-       (thread-send thd `(,@cmd ,res-ch ,nack-evt))))))
+  (handle-evt
+   (nack-guard-evt
+    (λ (nack-evt)
+      (begin0 res-ch
+        (thread-resume thd)
+        (thread-send thd `(,@cmd ,res-ch ,nack-evt)))))
+   (λ (v-or-exn)
+     (begin0 v-or-exn
+       (when (exn:fail? v-or-exn)
+         (raise v-or-exn))))))
 
-(define (disconnect c)
-  (void (sync (send c `(disconnect)))))
+(define-syntax-rule (send c cmd arg ...)
+  (do-send c (list 'cmd arg ...)))
 
-(define (subscribe c topic)
-  (void (sync (send c `(subscribe ,topic)))))
+(define-syntax-rule (send/sync c cmd arg ...)
+  (sync (send c cmd arg ...)))
 
-(define (unsubscribe c topic)
-  (void (sync (send c `(unsubscribe ,topic)))))
-
-(define (async-evt c)
+(define (async-evt [c (current-client)])
   (client-async-ch c))
 
-(define (get-info c)
-  (cadr (sync (send c `(info)))))
+(define (disconnect [c (current-client)])
+  (void (send/sync c disconnect)))
 
-(define (get-memory-use c)
-  (cadr (sync (send c `(memory-use)))))
+(define subscribe
+  (case-lambda
+    [(topic) (subscribe (current-client) topic)]
+    [(c topic) (void (send/sync c subscribe topic))]))
 
-(define (get-managed-item-counts c)
-  (cadr (sync (send c `(managed-item-counts)))))
+(define unsubscribe
+  (case-lambda
+    [(topic) (unsubscribe (current-client) topic)]
+    [(c topic) (void (send/sync c unsubscribe topic))]))
+
+(define (get-info [c (current-client)])
+  (cadr (send/sync c get-info)))
+
+(define (get-memory-use [c (current-client)])
+  (cadr (send/sync c get-memory-use)))
+
+(define (get-managed-item-counts [c (current-client)])
+  (cadr (send/sync c get-managed-item-counts)))

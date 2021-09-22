@@ -7,15 +7,24 @@
 (provide
  (struct-out gc-info)
  (contract-out
+  [current-client (parameter/c client?)]
   [client? (-> any/c boolean?)]
   [connect (->* ()
                 (#:host string?
                  #:port (integer-in 0 65535))
                 client?)]
-  [disconnect (-> client? void?)]
-  [subscribe (-> client? symbol? void?)]
-  [unsubscribe (-> client? symbol? void?)]
-  [async-evt (-> client? evt?)]
-  [get-info (-> client? hash?)]
-  [get-memory-use (-> client? exact-positive-integer?)]
-  [get-managed-item-counts (-> client? (hash/c symbol? (or/c exact-positive-integer? list?)))]))
+  [disconnect (client-> void?)]
+  [subscribe (case-client-> symbol? void?)]
+  [unsubscribe (case-client-> symbol? void?)]
+  [async-evt (client-> evt?)]
+  [get-info (client-> hash?)]
+  [get-memory-use (client-> exact-positive-integer?)]
+  [get-managed-item-counts (client-> (hash/c symbol? (or/c exact-positive-integer? list?)))]))
+
+(define-syntax-rule (client-> arg/c ... res/c)
+  (->* (arg/c ...) (client?) res/c))
+
+(define-syntax-rule (case-client-> arg/c ... res/c)
+  (case->
+   (-> arg/c ... res/c)
+   (-> client? arg/c ... res/c)))

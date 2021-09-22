@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require racket/match
+         racket/place
          racket/tcp
          "common.rkt"
          "gc.rkt")
@@ -119,16 +120,20 @@
                (write/flush `(pong ,id))
                (loop)]
 
-              [`(info ,id)
+              [`(get-info ,id)
                (write/flush `(info ,id ,system-info))
                (loop)]
 
-              [`(memory-use ,id)
+              [`(get-memory-use ,id)
                (write/flush `(memory-use ,id ,(current-memory-use)))
                (loop)]
 
-              [`(managed-item-counts ,id)
+              [`(get-managed-item-counts ,id)
                (write/flush `(managed-item-counts ,id ,(compute-managed-item-counts)))
+               (loop)]
+
+              [`(,cmd ,id ,args ...)
+               (write/flush `(error ,id ,(format "invalid message: ~e" `(,cmd ,@args))))
                (loop)]
 
               [message
@@ -136,23 +141,18 @@
                (loop)]))))))))
 
 (define (compute-managed-item-counts [cust (current-custodian)]
-                                     [super (current-root-custodian)])
+                                     [parent (current-root-custodian)])
   (for/fold ([counts (hasheq)])
-            ([item (in-list (custodian-managed-list cust super))])
-    (cond
-      [(input-port? item)
-       (hash-update counts 'input-ports add1 0)]
-      [(output-port? item)
-       (hash-update counts 'output-ports add1 0)]
-      [(tcp-listener? item)
-       (hash-update counts 'tcp-listeners add1 0)]
-      [(thread? item)
-       (hash-update counts 'threads add1 0)]
-      [(custodian? item)
-       (hash-update counts
-                    'custodians
-                    (λ (custs)
-                      (cons (compute-managed-item-counts item cust) custs))
-                    null)]
-      [else
-       (hash-update counts 'unknown add1 0)])))
+            ([item (in-list (custodian-managed-list cust parent))])
+    (define-values (key default updater)
+      (cond
+        [(custodian? item)
+         (values 'custodian null (λ (custs)
+                                   (cons (compute-managed-item-counts item cust) custs)))]
+        [(input-port? item)   (values 'input-ports   0 add1)]
+        [(output-port? item)  (values 'output-ports  0 add1)]
+        [(tcp-listener? item) (values 'tcp-listeners 0 add1)]
+        [(thread? item)       (values 'threads       0 add1)]
+        [(place? item)        (values 'places        0 add1)]
+        [else                 (values 'unknown       0 add1)]))
+    (hash-update counts key updater default)))
