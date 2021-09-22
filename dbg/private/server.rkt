@@ -8,6 +8,10 @@
 (provide
  serve)
 
+(define system-info
+  (for/hasheq ([k (in-list '(os* arch vm))])
+    (values k (system-type k))))
+
 (define (serve #:host [host "127.0.0.1"]
                #:port [port 9011])
   (define cmd-ch (make-channel))
@@ -49,8 +53,9 @@
           (handle-evt
            gc-info-evt
            (λ (data)
+             (define ts (/ (current-inexact-milliseconds) 1000))
              (for ([ch (in-list (hash-ref subscriptions 'gc null))])
-               (sync/timeout 0 (channel-put-evt ch `(gc ,data))))
+               (sync/timeout 0 (channel-put-evt ch `(gc ,ts ,data))))
              (loop subscriptions))))))))
   (λ ()
     (channel-put stop-ch '(stop))
@@ -94,6 +99,14 @@
 
             [`(ping ,id)
              (write/flush `(pong ,id) client-out)
+             (loop)]
+
+            [`(info ,id)
+             (write/flush `(info ,id ,system-info) client-out)
+             (loop)]
+
+            [`(memory-use ,id)
+             (write/flush `(memory-use ,id ,(current-memory-use)) client-out)
              (loop)]
 
             [message

@@ -15,4 +15,6 @@
   [disconnect (-> client? void?)]
   [subscribe (-> client? symbol? void?)]
   [unsubscribe (-> client? symbol? void?)]
-  [async-evt (-> client? evt?)]))
+  [async-evt (-> client? evt?)]
+  [get-info (-> client? hash?)]
+  [get-memory-use (-> client? exact-positive-integer?)]))

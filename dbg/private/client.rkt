@@ -10,7 +10,9 @@
  disconnect
  subscribe
  unsubscribe
- async-evt)
+ async-evt
+ get-info
+ get-memory-use)
 
 (struct client (async-ch manager-thd))
 
@@ -49,8 +51,8 @@
                    [(? eof-object?)
                     (values #f #f)]
 
-                   [`(async ,topic ,data)
-                    (values 'async `(,topic ,data))]
+                   [`(async ,topic ,ts ,data)
+                    (values 'async `(,topic ,ts ,data))]
 
                    [`(error ,id ,message)
                     (values id (exn:fail message (current-continuation-marks)))]
@@ -120,3 +122,9 @@
 
 (define (async-evt c)
   (client-async-ch c))
+
+(define (get-info c)
+  (cadr (sync (send c `(info)))))
+
+(define (get-memory-use c)
+  (cadr (sync (send c `(memory-use)))))
