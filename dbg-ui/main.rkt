@@ -14,7 +14,7 @@
 (struct memory-tick (ts amount)
   #:transparent)
 
-(struct gc-tick (ts mode post-amount duration)
+(struct gc-tick (ts mode amount duration)
   #:transparent)
 
 (struct state
@@ -114,12 +114,13 @@
    (labeled "Virtual machine:" (text (~a (hash-ref info 'vm))))))
 
 (define (charts-tab @state action)
+  (define/obs @have-gc-data?
+    (@state . ~> . (compose1 not null? state-memory-use/time)))
   (define/obs @hist
     (state-history (obs-peek @state)))
   (vpanel
    (labeled "Memory use:" (text (@state . ~> . (compose1 ~MiB state-memory-use))))
-   (labeled "Max GC duration:" (text (@state . ~> . (λ (s)
-                                                      (format "~a ms" (state-gc-duration/max s))))))
+   (labeled "Max GC duration:" (text (@state . ~> . (compose1 ~ms state-gc-duration/max))))
    (hpanel
     (vpanel
      (hpanel
@@ -128,7 +129,7 @@
        "Max history:"
        (input
         #:stretch '(#f #f)
-        #:min-size '(180 #f)
+        #:min-size '(240 #f)
         (@hist . ~> . number->string)
         (λ (event text)
           (case event
@@ -136,85 +137,18 @@
              (define hist (string->number text))
              (when hist
                (@hist . := . hist)
-               (action 'change-history hist))])))))
+               (action `(commit-history ,hist)))])))))
      (cond-view
-      [(@state . ~> . (compose1 not null? state-memory-use/time))
+      [@have-gc-data?
        (hpanel
-        (plot-canvas
-         @state
-         (λ (s w h)
-           (parameterize ([plot-title "Memory Use"]
-                          [plot-x-label "Time"]
-                          [plot-y-label "MiB"]
-                          [plot-x-ticks (date-ticks)]
-                          [plot-pen-color-map 'tab20c])
-             (define max-memory (->MiB (state-memory-use/max s)))
-             (define memory-use
-               (for/list ([t (in-list (state-memory-use/time s))])
-                 `(,(memory-tick-ts t)
-                   ,(->MiB (memory-tick-amount t)))))
-             (define major-gcs
-               (for/list ([t (in-list (state-gcs/time s))]
-                          #:when (eq? 'major (gc-tick-mode t)))
-                 `(,(gc-tick-ts t)
-                   ,(->MiB (gc-tick-post-amount t)))))
+        (plot-canvas @state plot-memory-usage)
+        (plot-canvas @state plot-gc-pauses))]
 
-             (plot-snip
-              #:width w
-              #:height h
-              #:y-min 0
-              #:y-max (* 1.25 max-memory)
-              (list
-               (hrule
-                #:label "Max Memory"
-                #:style 'long-dash
-                max-memory)
-               (area
-                #:label "Memory"
-                #:color 4
-                #:line1-color 4
-                #:line1-style 'transparent
-                #:line2-color 4
-                memory-use)
-               (points
-                #:label "Major GC"
-                #:sym 'times
-                #:color 4
-                #:size 12
-                major-gcs))))))
-        (plot-canvas
-         @state
-         (λ (s w h)
-           (parameterize ([plot-title "GC Pauses"]
-                          [plot-x-label "Time"]
-                          [plot-y-label "Duration (ms)"]
-                          [plot-x-ticks (date-ticks)]
-                          [plot-pen-color-map 'tab20c])
-             (define minor-gcs
-               (for/list ([t (in-list (state-gcs/time s))]
-                          #:when (eq? 'minor (gc-tick-mode t)))
-                 `(,(gc-tick-ts t)
-                   ,(gc-tick-duration t))))
-             (define major-gcs
-               (for/list ([t (in-list (state-gcs/time s))]
-                          #:when (eq? 'major (gc-tick-mode t)))
-                 `(,(gc-tick-ts t)
-                   ,(gc-tick-duration t))))
-             (plot-snip
-              #:width w
-              #:height h
-              #:y-min 0
-              #:y-max (* 1.25
-                         (max
-                          (if (null? minor-gcs) 0 (apply max (map cadr minor-gcs)))
-                          (if (null? major-gcs) 0 (apply max (map cadr major-gcs)))))
-              (list
-               (points #:label "Major GC" #:color 4 major-gcs)
-               (points #:label "Minor GC" #:color 1 minor-gcs)))))))]
       [else
        (text "No GC data yet.")])))))
 
-(define (run [host "127.0.0.1"] [port 9011])
+(define (run [host "127.0.0.1"]
+             [port 9011])
   (define c
     (connect
      #:host host
@@ -244,14 +178,84 @@
        (info-tab info)]
 
       [(charts)
-       (charts-tab @state/deb (λ (event v)
-                                (case event
-                                  [(change-history)
-                                   (@state . <~ . (λ (s)
-                                                    (struct-copy state s [history v])))])))]
+       (charts-tab
+        @state/deb
+        (match-lambda
+          [`(commit-history ,hist)
+           (@state . <~ . (λ (s)
+                            (struct-copy state s [history hist])))]))]
 
       [else
        (hpanel)])))))
+
+(define (plot-memory-usage s w h)
+  (parameterize ([plot-title "Memory Use"]
+                 [plot-x-label "Time"]
+                 [plot-y-label "MiB"]
+                 [plot-x-ticks (date-ticks)]
+                 [plot-pen-color-map 'tab20c])
+    (define max-memory (->MiB (state-memory-use/max s)))
+    (define memory-use
+      (for/list ([t (in-list (state-memory-use/time s))])
+        `(,(memory-tick-ts t)
+          ,(->MiB (memory-tick-amount t)))))
+    (define major-gcs
+      (for/list ([t (in-list (state-gcs/time s))]
+                 #:when (eq? 'major (gc-tick-mode t)))
+        `(,(gc-tick-ts t)
+          ,(->MiB (gc-tick-amount t)))))
+
+    (plot-snip
+     #:width w
+     #:height h
+     #:y-min 0
+     #:y-max (* 1.10 max-memory)
+     (list
+      (hrule
+       #:label "Max Memory"
+       #:style 'long-dash
+       max-memory)
+      (area
+       #:label "Memory"
+       #:color 4
+       #:line1-color 4
+       #:line1-style 'transparent
+       #:line2-color 4
+       memory-use)
+      (points
+       #:label "Major GC"
+       #:sym 'times
+       #:color 4
+       #:size 12
+       major-gcs)))))
+
+(define (plot-gc-pauses s w h)
+  (parameterize ([plot-title "GC Pauses"]
+                 [plot-x-label "Time"]
+                 [plot-y-label "Duration (ms)"]
+                 [plot-x-ticks (date-ticks)]
+                 [plot-pen-color-map 'tab20c])
+    (define minor-gcs
+      (for/list ([t (in-list (state-gcs/time s))]
+                 #:when (eq? 'minor (gc-tick-mode t)))
+        `(,(gc-tick-ts t)
+          ,(gc-tick-duration t))))
+    (define major-gcs
+      (for/list ([t (in-list (state-gcs/time s))]
+                 #:when (eq? 'major (gc-tick-mode t)))
+        `(,(gc-tick-ts t)
+          ,(gc-tick-duration t))))
+    (plot-snip
+     #:width w
+     #:height h
+     #:y-min 0
+     #:y-max (* 1.10
+                (max
+                 (if (null? minor-gcs) 0 (apply max (map cadr minor-gcs)))
+                 (if (null? major-gcs) 0 (apply max (map cadr major-gcs)))))
+     (list
+      (points #:label "Major GC" #:color 4 major-gcs)
+      (points #:label "Minor GC" #:color 1 minor-gcs)))))
 
 (define (plot-canvas @data make-plot-snip)
   (canvas
@@ -281,6 +285,9 @@
 
 (define (~MiB v)
   (format "~aMiB" (~r #:precision '(= 2) (/ v 1024 1024))))
+
+(define (~ms v)
+  (format "~a ms" v))
 
 
 ;; main ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
