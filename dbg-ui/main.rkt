@@ -1,13 +1,16 @@
 #lang racket/base
 
 (require debugging/client
+         (prefix-in p: pict)
          plot
          racket/class
+         (prefix-in d: racket/draw)
          racket/format
          racket/gui/easy
          racket/gui/easy/operator
          racket/list
-         racket/match)
+         racket/match
+         "private/tree-view.rkt")
 
 ;; state ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -29,14 +32,6 @@
 (define (make-state)
   (state 100 0 0 null 0 null))
 
-(define (keep-right xs n)
-  (if (> (length xs) n)
-      (take-right xs n)
-      xs))
-
-(define (->MiB v)
-  (/ v 1024 1024))
-
 (define (set-memory-use s amt)
   (struct-copy state s
                [memory-use amt]
@@ -46,8 +41,9 @@
   (define hist (state-history s))
   (define mode (gc-info-mode i))
   (define amt (gc-info-post-amount i))
-  (define duration (- (gc-info-end-time i)
-                      (gc-info-start-time i)))
+  (define duration
+    (- (gc-info-end-time i)
+       (gc-info-start-time i)))
   (struct-copy
    state s
    [memory-use amt]
@@ -66,13 +62,13 @@
                `(,(gc-tick ts mode amt duration)))
               hist)]))
 
-(define (start-async-handler @state c)
+(define (start-async-handler @state evt)
   (thread
    (lambda ()
      (let loop ()
        (sync
         (handle-evt
-         (async-evt c)
+         evt
          (λ (topic&data)
            (match topic&data
              [`(gc ,ts ,info)
@@ -91,9 +87,6 @@
     (define/augment (on-close)
       (disconnect c))))
 
-(define (debounce obs)
-  (obs-debounce #:duration 16 obs))
-
 (define (labeled label v)
   (hpanel
    #:stretch '(#t #f)
@@ -103,7 +96,8 @@
     (text label))
    v))
 
-(define (info-tab info)
+(define (info-tab c)
+  (define info (get-info c))
   (vpanel
    #:stretch '(#t #t)
    #:alignment '(left top)
@@ -120,96 +114,164 @@
   (vpanel
    (labeled "Memory use:" (text (@state . ~> . (compose1 ~MiB state-memory-use))))
    (labeled "Max GC duration:" (text (@state . ~> . (compose1 ~ms state-gc-duration/max))))
-   (hpanel
-    (vpanel
-     (hpanel
-      #:stretch '(#t #f)
-      (labeled
-       "Max history:"
-       (input
-        #:stretch '(#f #f)
-        #:min-size '(240 #f)
-        (@hist . ~> . number->string)
-        (λ (event text)
-          (case event
-            [(return)
-             (define hist (string->number text))
-             (when hist
-               (@hist . := . hist)
-               (action `(commit-history ,hist)))])))))
-     (cond-view
-      [@have-gc-data?
-       (hpanel
-        (plot-canvas @state plot-memory-usage)
-        (plot-canvas @state plot-gc-pauses))]
+   (vpanel
+    (hpanel
+     #:stretch '(#t #f)
+     (labeled
+      "Max history:"
+      (input
+       #:stretch '(#f #f)
+       #:min-size '(240 #f)
+       (@hist . ~> . number->string)
+       (λ (event text)
+         (case event
+           [(return)
+            (define hist (string->number text))
+            (when hist
+              (@hist . := . hist)
+              (action `(commit-history ,hist)))])))))
+    (cond-view
+     [@have-gc-data?
+      (hpanel
+       (plot-canvas @state plot-memory-usage)
+       (plot-canvas @state plot-gc-pauses))]
 
-      [else
-       (text "No GC data yet.")])))))
+     [else
+      (text "No GC data yet.")]))))
+
+(define chevron-forward
+  (p:dc
+   (λ (dc dx dy)
+     (define path (new d:dc-path%))
+     (send path move-to 1 1)
+     (send path line-to 10 5)
+     (send path line-to 1 10)
+     (send path close)
+     (send dc draw-path path dx dy))
+   10 10))
+
+(define chevron-down
+  (p:dc
+   (λ (dc dx dy)
+     (define path (new d:dc-path%))
+     (send path move-to 1 1)
+     (send path line-to 5 10)
+     (send path line-to 10 1)
+     (send path close)
+     (send dc draw-path path dx dy))
+   10 10))
 
 (define (custodians-tab c)
-  (define/obs @counts (get-managed-item-counts c))
-  (define (rec-counts counts)
-    (apply
-     vpanel
-     #:alignment '(left top)
-     (for/list ([(kind c) (in-hash counts)])
-       (if (number? c)
-           (labeled (~a kind) (text (~a c)))
-           (labeled "custodians" (apply
-                                  vpanel
-                                  #:style '(auto-hscroll)
-                                  (map rec-counts c)))))))
+  (struct simple (label) #:transparent)
+  (struct nested (label) #:transparent)
+
+  ;; TODO: The server should serve data with a better structure.
+  (define (counts->tree counts)
+    (tree
+     (let loop ([counts counts] [depth 0])
+       (for/list ([(k v) (in-hash counts)])
+         (cond
+           [(number? v)
+            (entry (simple (format "~a (~a)" k v)) depth)]
+
+           [else
+            (define children
+              (for/list ([c (in-list v)] #:unless (hash-empty? c))
+                (container
+                 (nested (format "custodian (~a children)" (hash-count c)))
+                 (add1 depth) #f
+                 (loop c (+ depth 2)))))
+            (container
+             (nested (format "~a (~a children)" k (length children)))
+             depth #f children)])))))
+
+  (define (entry-pict item item-state depth open? w h)
+    (define-values (bg-color fg-color)
+      (case item-state
+        [(selected)
+         (values (color "blue")
+                 (color "white"))]
+        [else
+         (values (color "white")
+                 (color "black"))]))
+    (define label
+      (match item
+        [(simple label)
+         (p:inset
+          (p:colorize
+           (p:text label)
+           fg-color)
+          15 0)]
+        [(nested label)
+         (p:hc-append
+          5
+          (if open?
+              chevron-down
+              chevron-forward)
+          (p:colorize
+           (p:text label)
+           fg-color))]))
+    (p:lt-superimpose
+     (p:colorize (p:filled-rectangle w h) bg-color)
+     (p:inset label (+ 5 (* depth 15)) 5)))
+
+  (define/obs @counts-tree
+    (counts->tree (get-managed-item-counts c)))
+
   (vpanel
    (button
     "Reload"
     (λ ()
-      (@counts . := . (get-managed-item-counts c))))
-   (dyn-view @counts rec-counts)))
+      (@counts-tree . := . (counts->tree (get-managed-item-counts c)))))
+   (tree-view
+    @counts-tree
+    #:item-height 25
+    (λ (item item-state depth open? dc w h)
+      (p:draw-pict (entry-pict item item-state depth open? w h) dc 0 0))
+    #:action void
+    #:toggle (λ (it)
+               (@counts-tree . <~ . (λ (t) (tree-toggle t it)))))))
 
-(define (run [host "127.0.0.1"]
-             [port 9011])
-  (define c
-    (connect
-     #:host host
-     #:port port))
-  (define info (get-info c))
+(define (start-ui c)
   (define/obs @tab 'info)
   (define/obs @state
     (set-memory-use
      (make-state)
      (get-memory-use c)))
-  (define/obs @state/deb (debounce @state))
+  (define/obs @state/deb
+    (obs-debounce #:duration 16 @state))
+  (start-async-handler @state (async-evt c))
   (subscribe c 'gc)
-  (start-async-handler @state c)
   (render
    (window
     #:title "Remote Debugger"
     #:size '(800 400)
     #:mixin (make-window-mixin c)
-    (tabs
-     '("Info" "Charts" "Custodians")
-     (λ (event _choices index)
-       (case event
-         [(select)
-          (@tab . := . (list-ref '(info charts custodians) index))]))
-     (case-view
-      @tab
-      [(info)
-       (info-tab info)]
+    (let ([the-tabs '(info charts custodians)])
+      (tabs
+       (map (compose1 string-titlecase symbol->string) the-tabs)
+       (λ (event _choices index)
+         (case event
+           [(select)
+            (@tab . := . (list-ref the-tabs index))]))
+       (case-view
+        @tab
+        [(info)
+         (info-tab c)]
 
-      [(charts)
-       (charts-tab
-        @state/deb
-        (match-lambda
-          [`(commit-history ,hist)
-           (@state . <~ . (λ (s)
-                            (struct-copy state s [history hist])))]))]
+        [(charts)
+         (charts-tab
+          @state/deb
+          (match-lambda
+            [`(commit-history ,hist)
+             (@state . <~ . (λ (s)
+                              (struct-copy state s [history hist])))]))]
 
-      [(custodians)
-       (custodians-tab c)]
+        [(custodians)
+         (custodians-tab c)]
 
-      [else
-       (hpanel)])))))
+        [else
+         (hpanel)]))))))
 
 (define (plot-memory-usage s w h)
   (parameterize ([plot-title "Memory Use"]
@@ -306,6 +368,14 @@
 
 ;; helpers ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (keep-right xs n)
+  (if (> (length xs) n)
+      (take-right xs n)
+      xs))
+
+(define (->MiB v)
+  (/ v 1024 1024))
+
 (define (~MiB v)
   (format "~aMiB" (~r #:precision '(= 2) (/ v 1024 1024))))
 
@@ -334,4 +404,7 @@
        (values host port))))
 
   (void
-   (run host port)))
+   (start-ui
+    (connect
+     #:host host
+     #:port port))))
