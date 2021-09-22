@@ -25,12 +25,13 @@
    memory-use
    memory-use/max
    memory-use/time
+   gc-duration/total
    gc-duration/max
    gcs/time)
   #:transparent)
 
 (define (make-state)
-  (state 100 0 0 null 0 null))
+  (state 100 0 0 null 0 0 null))
 
 (define (set-memory-use s amt)
   (struct-copy state s
@@ -55,6 +56,7 @@
                       (state-memory-use/time s)
                       `(,(memory-tick ts amt)))
                      hist)]
+   [gc-duration/total (+ (state-gc-duration/total s) duration)]
    [gc-duration/max (max (state-gc-duration/max s) duration)]
    [gcs/time (keep-right
               (append
@@ -91,7 +93,7 @@
   (hpanel
    #:stretch '(#t #f)
    (hpanel
-    #:min-size '(120 #f)
+    #:min-size '(130 #f)
     #:stretch '(#f #t)
     (text label))
    v))
@@ -113,7 +115,8 @@
     (state-history (obs-peek @state)))
   (vpanel
    (labeled "Memory use:" (text (@state . ~> . (compose1 ~MiB state-memory-use))))
-   (labeled "Max GC duration:" (text (@state . ~> . (compose1 ~ms state-gc-duration/max))))
+   (labeled "Total GC time:" (text (@state . ~> . (compose1 ~ms state-gc-duration/total))))
+   (labeled "Longest GC pause:" (text (@state . ~> . (compose1 ~ms state-gc-duration/max))))
    (vpanel
     (hpanel
      #:stretch '(#t #f)
@@ -238,14 +241,16 @@
     (set-memory-use
      (make-state)
      (get-memory-use c)))
-  (define/obs @state/deb
-    (obs-debounce #:duration 16 @state))
+  (define/obs @state/throttled
+    (obs-throttle
+     #:duration 250
+     @state))
   (start-async-handler @state (async-evt c))
   (subscribe c 'gc)
   (render
    (window
     #:title "Remote Debugger"
-    #:size '(800 400)
+    #:size '(600 400)
     #:mixin (make-window-mixin c)
     (let ([the-tabs '(info charts custodians)])
       (tabs
@@ -261,7 +266,7 @@
 
         [(charts)
          (charts-tab
-          @state/deb
+          @state/throttled
           (match-lambda
             [`(commit-history ,hist)
              (@state . <~ . (λ (s)
