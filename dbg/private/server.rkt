@@ -9,8 +9,10 @@
  serve)
 
 (define system-info
-  (for/hasheq ([k (in-list '(os* arch vm))])
-    (values k (system-type k))))
+  (hash-set*
+   (for/hasheq ([k (in-list '(os* arch vm))])
+     (values k (system-type k)))
+   'version (version)))
 
 (define (serve #:host [host "127.0.0.1"]
                #:port [port 9011])

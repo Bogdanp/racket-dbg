@@ -110,8 +110,9 @@
    #:stretch '(#t #t)
    #:alignment '(left top)
    (labeled "Operating system:" (text (~a (hash-ref info 'os*))))
+   (labeled "Virtual machine:" (text (~a (hash-ref info 'vm))))
    (labeled "Architecture:" (text (~a (hash-ref info 'arch))))
-   (labeled "Virtual machine:" (text (~a (hash-ref info 'vm))))))
+   (labeled "Version:" (text (hash-ref info 'version)))))
 
 (define (charts-tab @state action)
   (define/obs @have-gc-data?
