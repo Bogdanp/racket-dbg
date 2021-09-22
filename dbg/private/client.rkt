@@ -12,7 +12,8 @@
  unsubscribe
  async-evt
  get-info
- get-memory-use)
+ get-memory-use
+ get-managed-item-counts)
 
 (struct client (async-ch manager-thd))
 
@@ -128,3 +129,6 @@
 
 (define (get-memory-use c)
   (cadr (sync (send c `(memory-use)))))
+
+(define (get-managed-item-counts c)
+  (cadr (sync (send c `(managed-item-counts)))))

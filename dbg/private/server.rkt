@@ -6,13 +6,28 @@
          "gc.rkt")
 
 (provide
- serve)
+ serve
+ serve/install-custodian)
 
 (define system-info
   (hash-set*
    (for/hasheq ([k (in-list '(os* arch vm))])
      (values k (system-type k)))
    'version (version)))
+
+(define current-root-custodian
+  (make-parameter #f))
+
+(define (serve/install-custodian
+         #:host [host "127.0.0.1"]
+         #:port [port 9011])
+  (define root (current-custodian))
+  (define cust (make-custodian))
+  (current-root-custodian root)
+  (current-custodian cust)
+  (serve
+   #:host host
+   #:port port))
 
 (define (serve #:host [host "127.0.0.1"]
                #:port [port 9011])
@@ -70,47 +85,74 @@
     (tcp-abandon-port client-out))
   (define async-ch
     (make-channel))
-  (let loop ()
-    (with-handlers ([exn:fail:network? (λ (_e) (disconnect))])
-      (sync
-       (handle-evt
-        async-ch
-        (λ (topic&data)
-          (write/flush `(async ,@topic&data) client-out)
-          (loop)))
-       (handle-evt
-        client-in
-        (λ (_)
-          (match (read client-in)
-            [(? eof-object?)
-             (disconnect)]
+  (parameterize ([current-output-port client-out])
+    (let loop ()
+      (with-handlers ([exn:fail:network? (λ (_e) (disconnect))])
+        (sync
+         (handle-evt
+          async-ch
+          (λ (topic&data)
+            (write/flush `(async ,@topic&data))
+            (loop)))
+         (handle-evt
+          client-in
+          (λ (_)
+            (match (read client-in)
+              [(? eof-object?)
+               (disconnect)]
 
-            [`(disconnect ,id)
-             (write/flush `(bye ,id) client-out)
-             (disconnect)]
+              [`(disconnect ,id)
+               (write/flush `(bye ,id))
+               (disconnect)]
 
-            [`(subscribe ,id ,topic)
-             (channel-put server-ch `(subscribe ,topic ,async-ch))
-             (write/flush `(ok ,id) client-out)
-             (loop)]
+              [`(subscribe ,id ,topic)
+               (channel-put server-ch `(subscribe ,topic ,async-ch))
+               (write/flush `(ok ,id))
+               (loop)]
 
-            [`(unsubscribe ,id ,topic)
-             (channel-put server-ch `(unsubscribe ,topic ,async-ch))
-             (write/flush `(ok ,id) client-out)
-             (loop)]
+              [`(unsubscribe ,id ,topic)
+               (channel-put server-ch `(unsubscribe ,topic ,async-ch))
+               (write/flush `(ok ,id))
+               (loop)]
 
-            [`(ping ,id)
-             (write/flush `(pong ,id) client-out)
-             (loop)]
+              [`(ping ,id)
+               (write/flush `(pong ,id))
+               (loop)]
 
-            [`(info ,id)
-             (write/flush `(info ,id ,system-info) client-out)
-             (loop)]
+              [`(info ,id)
+               (write/flush `(info ,id ,system-info))
+               (loop)]
 
-            [`(memory-use ,id)
-             (write/flush `(memory-use ,id ,(current-memory-use)) client-out)
-             (loop)]
+              [`(memory-use ,id)
+               (write/flush `(memory-use ,id ,(current-memory-use)))
+               (loop)]
 
-            [message
-             (write/flush `(error ,(format "invalid message: ~e" message)) client-out)
-             (loop)])))))))
+              [`(managed-item-counts ,id)
+               (write/flush `(managed-item-counts ,id ,(compute-managed-item-counts)))
+               (loop)]
+
+              [message
+               (write/flush `(error ,(format "invalid message: ~e" message)))
+               (loop)]))))))))
+
+(define (compute-managed-item-counts [cust (current-custodian)]
+                                     [super (current-root-custodian)])
+  (for/fold ([counts (hasheq)])
+            ([item (in-list (custodian-managed-list cust super))])
+    (cond
+      [(input-port? item)
+       (hash-update counts 'input-ports add1 0)]
+      [(output-port? item)
+       (hash-update counts 'output-ports add1 0)]
+      [(tcp-listener? item)
+       (hash-update counts 'tcp-listeners add1 0)]
+      [(thread? item)
+       (hash-update counts 'threads add1 0)]
+      [(custodian? item)
+       (hash-update counts
+                    'custodians
+                    (λ (custs)
+                      (cons (compute-managed-item-counts item cust) custs))
+                    null)]
+      [else
+       (hash-update counts 'unknown add1 0)])))

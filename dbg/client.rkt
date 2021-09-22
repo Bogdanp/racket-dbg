@@ -17,4 +17,5 @@
   [unsubscribe (-> client? symbol? void?)]
   [async-evt (-> client? evt?)]
   [get-info (-> client? hash?)]
-  [get-memory-use (-> client? exact-positive-integer?)]))
+  [get-memory-use (-> client? exact-positive-integer?)]
+  [get-managed-item-counts (-> client? (hash/c symbol? (or/c exact-positive-integer? list?)))]))

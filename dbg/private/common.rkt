@@ -3,6 +3,6 @@
 (provide
  write/flush)
 
-(define (write/flush data out)
+(define (write/flush data [out (current-output-port)])
   (write data out)
   (flush-output out))
