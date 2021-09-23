@@ -144,15 +144,19 @@
                                      [parent (current-root-custodian)])
   (for/fold ([counts (hasheq)])
             ([item (in-list (custodian-managed-list cust parent))])
-    (define-values (key default updater)
-      (cond
-        [(custodian? item)
-         (values 'custodian null (λ (custs)
-                                   (cons (compute-managed-item-counts item cust) custs)))]
-        [(input-port? item)   (values 'input-ports   0 add1)]
-        [(output-port? item)  (values 'output-ports  0 add1)]
-        [(tcp-listener? item) (values 'tcp-listeners 0 add1)]
-        [(thread? item)       (values 'threads       0 add1)]
-        [(place? item)        (values 'places        0 add1)]
-        [else                 (values 'unknown       0 add1)]))
-    (hash-update counts key updater default)))
+    (cond
+      [(custodian? item)
+       (hash-update
+        (for/hash ([(k v) (in-hash (compute-managed-item-counts item cust))])
+          (values k (+ (hash-ref counts k 0) v)))
+        'custodians add1 0)]
+      [else
+       (define-values (key default updater)
+         (cond
+           [(input-port? item)   (values 'input-ports   0 add1)]
+           [(output-port? item)  (values 'output-ports  0 add1)]
+           [(tcp-listener? item) (values 'tcp-listeners 0 add1)]
+           [(thread? item)       (values 'threads       0 add1)]
+           [(place? item)        (values 'places        0 add1)]
+           [else                 (values 'unknown       0 add1)]))
+       (hash-update counts key updater default)])))

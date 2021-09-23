@@ -1,16 +1,13 @@
 #lang racket/base
 
 (require debugging/client
-         (prefix-in p: pict)
          plot
          racket/class
-         (prefix-in d: racket/draw)
          racket/format
          racket/gui/easy
          racket/gui/easy/operator
          racket/list
-         racket/match
-         "private/tree-view.rkt")
+         racket/match)
 
 ;; state ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -142,98 +139,29 @@
      [else
       (text "No GC data yet.")]))))
 
-(define chevron-forward
-  (p:dc
-   (λ (dc dx dy)
-     (define path (new d:dc-path%))
-     (send path move-to 1 1)
-     (send path line-to 10 5)
-     (send path line-to 1 10)
-     (send path close)
-     (send dc draw-path path dx dy))
-   10 10))
-
-(define chevron-down
-  (p:dc
-   (λ (dc dx dy)
-     (define path (new d:dc-path%))
-     (send path move-to 1 1)
-     (send path line-to 5 10)
-     (send path line-to 10 1)
-     (send path close)
-     (send dc draw-path path dx dy))
-   10 10))
-
+;; TODO: Refresh periodically.
 (define (custodians-tab c)
-  (struct simple (label) #:transparent)
-  (struct nested (label) #:transparent)
-
-  ;; TODO: The server should serve data with a better structure.
-  (define (counts->tree counts)
-    (tree
-     (let loop ([counts counts] [depth 0])
-       (for/list ([(k v) (in-hash counts)])
-         (cond
-           [(number? v)
-            (entry (simple (format "~a (~a)" k v)) depth)]
-
-           [else
-            (define children
-              (for/list ([c (in-list v)] #:unless (hash-empty? c))
-                (container
-                 (nested (format "custodian (~a children)" (hash-count c)))
-                 (add1 depth) #f
-                 (loop c (+ depth 2)))))
-            (container
-             (nested (format "~a (~a children)" k (length children)))
-             depth #f children)])))))
-
-  (define (entry-pict item item-state depth open? w h)
-    (define-values (bg-color fg-color)
-      (case item-state
-        [(selected)
-         (values (color "blue")
-                 (color "white"))]
-        [else
-         (values (color "white")
-                 (color "black"))]))
-    (define label
-      (match item
-        [(simple label)
-         (p:inset
-          (p:colorize
-           (p:text label)
-           fg-color)
-          15 0)]
-        [(nested label)
-         (p:hc-append
-          5
-          (if open?
-              chevron-down
-              chevron-forward)
-          (p:colorize
-           (p:text label)
-           fg-color))]))
-    (p:lt-superimpose
-     (p:colorize (p:filled-rectangle w h) bg-color)
-     (p:inset label (+ 5 (* depth 15)) 5)))
-
-  (define/obs @counts-tree
-    (counts->tree (get-managed-item-counts c)))
+  (define/obs @counts
+    (get-managed-item-counts c))
 
   (vpanel
    (button
     "Reload"
     (λ ()
-      (@counts-tree . := . (counts->tree (get-managed-item-counts c)))))
-   (tree-view
-    @counts-tree
-    #:item-height 25
-    (λ (item item-state depth open? dc w h)
-      (p:draw-pict (entry-pict item item-state depth open? w h) dc 0 0))
-    #:action void
-    #:toggle (λ (it)
-               (@counts-tree . <~ . (λ (t) (tree-toggle t it)))))))
+      (@counts . := . (get-managed-item-counts c))))
+   (table
+    '("Kind" "Count")
+    (@counts . ~> . (λ (counts)
+                      (list->vector
+                       (sort
+                        (for/list ([(k v) (in-hash counts)])
+                          (cons k v))
+                        #:key cdr >))))
+    #:entry->row (λ (entry)
+                   (vector
+                    (~a (car entry))
+                    (~a (cdr entry))))
+    void)))
 
 (define (start-ui c)
   (define/obs @tab 'info)
