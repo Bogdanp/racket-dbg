@@ -83,6 +83,9 @@
 
 ;; components ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define-syntax-rule (defer e0 e ...)
+  (thread (λ () e0 e ...)))
+
 (define ((make-window-mixin c) %)
   (class %
     (super-new)
@@ -142,7 +145,6 @@
      [else
       (text "No GC data yet.")]))))
 
-;; TODO: Refresh periodically.
 (define (custodians-tab c)
   (define (->entries counts)
     (list->vector
@@ -151,21 +153,26 @@
         (cons k v))
       #:key cdr >)))
 
-  (define/obs @counts
-    (get-managed-item-counts c))
+  (define/obs @counts #f)
+  (define (reload)
+    (defer (@counts . := . (get-managed-item-counts c))))
 
+  (reload)
   (vpanel
-   (button
-    "Reload"
-    (λ ()
-      (@counts . := . (get-managed-item-counts c))))
-   (table
-    '("Kind" "Count")
-    (@counts . ~> . ->entries)
-    #:entry->row (λ (entry)
-                   (vector
-                    (~a (car entry))
-                    (~a (cdr entry)))))))
+   (button "Reload" reload)
+   (cond-view
+    [@counts
+     (table
+      '("Kind" "Count")
+      (@counts . ~> . (λ (maybe-counts)
+                        (->entries (or maybe-counts (hasheq)))))
+      #:entry->row (λ (entry)
+                     (vector
+                      (~a (car entry))
+                      (~a (cdr entry)))))]
+
+    [else
+     (text "Loading...")])))
 
 (define (start-ui c)
   (define/obs @tab 'info)
