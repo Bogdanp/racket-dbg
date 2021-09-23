@@ -141,6 +141,13 @@
 
 ;; TODO: Refresh periodically.
 (define (custodians-tab c)
+  (define (->entries counts)
+    (list->vector
+     (sort
+      (for/list ([(k v) (in-hash counts)])
+        (cons k v))
+      #:key cdr >)))
+
   (define/obs @counts
     (get-managed-item-counts c))
 
@@ -151,17 +158,11 @@
       (@counts . := . (get-managed-item-counts c))))
    (table
     '("Kind" "Count")
-    (@counts . ~> . (λ (counts)
-                      (list->vector
-                       (sort
-                        (for/list ([(k v) (in-hash counts)])
-                          (cons k v))
-                        #:key cdr >))))
+    (@counts . ~> . ->entries)
     #:entry->row (λ (entry)
                    (vector
                     (~a (car entry))
-                    (~a (cdr entry))))
-    void)))
+                    (~a (cdr entry)))))))
 
 (define (start-ui c)
   (define/obs @tab 'info)
