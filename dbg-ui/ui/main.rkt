@@ -145,6 +145,7 @@
       (text "No GC data.")]))))
 
 (define (memory-tab c)
+  (define/obs @filter-re (regexp ""))
   (define/obs @counts #f)
   (define (reload)
     (defer (@counts . := . (get-object-counts c))))
@@ -159,16 +160,25 @@
     (vpanel
      #:alignment '(left center)
      (labeled
-      "Total bytes: "
+      "Total size: "
       (text (@counts . ~> . (compose1 ~size compute-total-bytes)))))
+    (hpanel
+     #:alignment '(right center)
+     (text "Filter:")
+     (input "" (λ (_ text)
+                 (@filter-re . := . (regexp text)))))
     (button "Reload" reload))
    (cond-view
     [@counts
      (table
       '("Kind" "Count" "Size")
       #:column-widths `((0 320))
-      (@counts . ~> . (λ (maybe-counts)
-                        (list->vector (or maybe-counts null))))
+      (obs-combine
+       (λ (maybe-counts filter-re)
+         (for/vector ([c (in-list (or maybe-counts null))]
+                      #:when (regexp-match? filter-re (car c)))
+           c))
+       @counts @filter-re)
       #:entry->row (λ (entry)
                      (vector
                       (car entry)
