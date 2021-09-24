@@ -28,17 +28,16 @@
   (define-values (counts _backrefs)
     (get-counts&backrefs))
   (define counts-by-str
-    (for/fold ([res (hash)])
-              ([c (in-list counts)])
-      (define str (object->string (car c)))
-      (for/fold ([res res])
-                ([gen (in-list (cdr c))])
-        (hash-update res str
-                     (λ (cnt)
-                       (cons
-                        (+ (cadr gen) (car cnt))
-                        (+ (cddr gen) (cdr cnt))))
-                     (cons 0 0)))))
+    (for*/fold ([res (hash)])
+               ([c (in-list counts)]
+                [str (in-value (object->string (car c)))]
+                [gen (in-list (cdr c))])
+      (hash-update res str
+                   (λ (cnt)
+                     (cons
+                      (+ (cadr gen) (car cnt))
+                      (+ (cddr gen) (cdr cnt))))
+                   (cons 0 0))))
   (sort (hash-map counts-by-str cons) #:key cddr >))
 
 (define (object->string o)
