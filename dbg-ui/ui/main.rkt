@@ -339,12 +339,16 @@
 (define (~size bs)
   (define-values (n suffix)
     (let loop ([n bs]
-               [s '("B" "KiB" "MiB" "GiB" "TiB")])
-      (cond
-        [(= (length s) 1)
-         (values n (car s))]
-        [(< n 1024)
-         (values n (car s))]
-        [else
-         (loop (/ n 1024.0) (cdr s))])))
-  (format "~a~a" (if (exact? n) n (~r #:precision '(= 2) n)) suffix))
+               [suffix "B"]
+               [suffixes '("KiB" "MiB" "GiB" "TiB")])
+      (if (or (empty? suffixes)
+              (< n 1024))
+          (values n suffix)
+          (loop (/ n 1024.0)
+                (car suffixes)
+                (cdr suffixes)))))
+  (define n-str
+    (if (integer? n)
+        (~r n)
+        (~r #:precision '(= 2) n)))
+  (~a n-str suffix))
