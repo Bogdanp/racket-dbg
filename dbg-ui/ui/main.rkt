@@ -266,7 +266,6 @@
       (area
        #:label "Memory"
        #:color 4
-       #:line1-color 4
        #:line1-style 'transparent
        #:line2-color 4
        memory-use)
