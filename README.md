@@ -3,7 +3,9 @@
 A server, client and UI for remotely debugging Racket applications.
 Very much a work in progress.
 
-![screenshot](media/screenshot.png)
+<center>
+  <img src="https://github.com/Bogdanp/racket-dbg/raw/master/media/screenshot.png" alt="screenshot" width="600" height="400" />
+</center>
 
 ## Usage
 ### Run a server
