@@ -1,35 +1,19 @@
 #lang racket/base
 
 (require racket/match
-         racket/place
          racket/tcp
          "common.rkt"
          "gc.rkt"
          "memory.rkt")
 
 (provide
- serve
- serve/install-custodian)
+ serve)
 
 (define system-info
   (hash-set*
    (for/hasheq ([k (in-list '(os* arch vm))])
      (values k (system-type k)))
    'version (version)))
-
-(define current-root-custodian
-  (make-parameter #f))
-
-(define (serve/install-custodian
-         #:host [host "127.0.0.1"]
-         #:port [port 9011])
-  (define root (current-custodian))
-  (define cust (make-custodian))
-  (current-root-custodian root)
-  (current-custodian cust)
-  (serve
-   #:host host
-   #:port port))
 
 (define (serve #:host [host "127.0.0.1"]
                #:port [port 9011])
