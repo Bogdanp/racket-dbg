@@ -4,7 +4,8 @@
          racket/place
          racket/tcp
          "common.rkt"
-         "gc.rkt")
+         "gc.rkt"
+         "memory.rkt")
 
 (provide
  serve
@@ -130,6 +131,10 @@
 
               [`(get-managed-item-counts ,id)
                (write/flush `(managed-item-counts ,id ,(compute-managed-item-counts)))
+               (loop)]
+
+              [`(get-object-counts ,id)
+               (write/flush `(object-counts ,id ,(get-object-counts)))
                (loop)]
 
               [`(,cmd ,id ,args ...)
