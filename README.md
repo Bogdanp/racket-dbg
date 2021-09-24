@@ -1,9 +1,9 @@
 # dbg
 
-![screenshot](media/screenshot.png)
-
 A server, client and UI for remotely debugging Racket applications.
 Very much a work in progress.
+
+![screenshot](media/screenshot.png)
 
 ## Usage
 ### Run a server
