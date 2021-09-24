@@ -104,7 +104,6 @@
 (define (info-tab c)
   (define info (get-info c))
   (vpanel
-   #:stretch '(#t #t)
    #:alignment '(left top)
    (labeled "Operating system:" (text (~a (hash-ref info 'os*))))
    (labeled "Virtual machine:" (text (~a (hash-ref info 'vm))))
@@ -117,7 +116,7 @@
   (define/obs @hist
     (state-history (obs-peek @state)))
   (vpanel
-   (labeled "Memory use:" (text (@state . ~> . (compose1 ~MiB state-memory-use))))
+   (labeled "Memory use:" (text (@state . ~> . (compose1 ~size state-memory-use))))
    (labeled "Total GC time:" (text (@state . ~> . (compose1 ~ms state-gc-duration/total))))
    (labeled "Longest GC pause:" (text (@state . ~> . (compose1 ~ms state-gc-duration/max))))
    (vpanel
@@ -143,7 +142,40 @@
        (plot-canvas @state plot-gc-pauses))]
 
      [else
-      (text "No GC data yet.")]))))
+      (text "No GC data.")]))))
+
+(define (memory-tab c)
+  (define/obs @counts #f)
+  (define (reload)
+    (defer (@counts . := . (get-object-counts c))))
+  (define (compute-total-bytes counts)
+    (for/sum ([c (in-list (or counts null))])
+      (cddr c)))
+
+  (reload)
+  (vpanel
+   (hpanel
+    #:stretch '(#t #f)
+    (vpanel
+     #:alignment '(left center)
+     (labeled
+      "Total bytes: "
+      (text (@counts . ~> . (compose1 ~size compute-total-bytes)))))
+    (button "Reload" reload))
+   (cond-view
+    [@counts
+     (table
+      '("Kind" "Count" "Size")
+      #:column-widths `((0 320))
+      (@counts . ~> . (λ (maybe-counts)
+                        (list->vector (or maybe-counts null))))
+      #:entry->row (λ (entry)
+                     (vector
+                      (car entry)
+                      (~a (cadr entry))
+                      (~size (cddr entry)))))]
+    [else
+     (text "Loading...")])))
 
 (define (custodians-tab c)
   (define (->entries counts)
@@ -191,7 +223,7 @@
     #:title "Remote Debugger"
     #:size '(600 400)
     #:mixin (make-window-mixin c)
-    (let ([the-tabs '(info charts custodians)])
+    (let ([the-tabs '(info charts memory custodians)])
       (tabs
        (map (compose1 string-titlecase symbol->string) the-tabs)
        (λ (event _choices index)
@@ -210,6 +242,9 @@
             [`(commit-history ,hist)
              (@state . <~ . (λ (s)
                               (struct-copy state s [history hist])))]))]
+
+        [(memory)
+         (memory-tab c)]
 
         [(custodians)
          (custodians-tab c)]
@@ -320,8 +355,18 @@
 (define (->MiB v)
   (/ v 1024 1024))
 
-(define (~MiB v)
-  (format "~aMiB" (~r #:precision '(= 2) (/ v 1024 1024))))
-
 (define (~ms v)
   (format "~a ms" v))
+
+(define (~size bs)
+  (define-values (n suffix)
+    (let loop ([n bs]
+               [s '("B" "KiB" "MiB" "GiB" "TiB")])
+      (cond
+        [(= (length s) 1)
+         (values n (car s))]
+        [(< n 1024)
+         (values n (car s))]
+        [else
+         (loop (/ n 1024.0) (cdr s))])))
+  (format "~a~a" (if (exact? n) n (~r #:precision '(= 2) n)) suffix))
