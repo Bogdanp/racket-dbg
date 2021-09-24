@@ -2,7 +2,8 @@
 
 (require racket/contract
          "private/client.rkt"
-         "private/gc.rkt")
+         (except-in "private/memory.rkt"
+                    get-object-counts))
 
 (provide
  (struct-out gc-info)

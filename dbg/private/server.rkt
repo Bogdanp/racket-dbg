@@ -3,7 +3,6 @@
 (require racket/match
          racket/tcp
          "common.rkt"
-         "gc.rkt"
          "memory.rkt")
 
 (provide
