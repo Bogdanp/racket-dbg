@@ -117,7 +117,7 @@
     (state-history (obs-peek @state)))
   (vpanel
    (labeled "Memory use:" (text (@state . ~> . (compose1 ~size state-memory-use))))
-   (labeled "Total GC time:" (text (@state . ~> . (compose1 ~ms state-gc-duration/total))))
+   (labeled "Total GC time:" (text (@state . ~> . (compose1 ~duration state-gc-duration/total))))
    (labeled "Longest GC pause:" (text (@state . ~> . (compose1 ~ms state-gc-duration/max))))
    (vpanel
     (hpanel
@@ -146,9 +146,12 @@
 
 (define (memory-tab c)
   (define/obs @filter-re (regexp ""))
+  (define/obs @memory-use 0)
   (define/obs @counts #f)
   (define (reload)
-    (defer (@counts . := . (get-object-counts c))))
+    (defer
+      (@memory-use . := . (get-memory-use c))
+      (@counts . := . (get-object-counts c))))
   (define (compute-total-bytes counts)
     (for/sum ([c (in-list (or counts null))])
       (cddr c)))
@@ -160,7 +163,10 @@
     (vpanel
      #:alignment '(left center)
      (labeled
-      "Total size: "
+      "Total allocated:"
+      (text (@memory-use . ~> . ~size)))
+     (labeled
+      "Total size:"
       (text (@counts . ~> . (compose1 ~size compute-total-bytes)))))
     (hpanel
      #:alignment '(right center)
@@ -335,6 +341,15 @@
 
 (define (~ms v)
   (format "~a ms" v))
+
+(define (pad n [width 2])
+  (~a #:width width #:pad-string "0" #:align 'right n))
+
+(define (~duration ms)
+  (~a (pad (quotient ms 3600000)) ":"
+      (pad (modulo (quotient ms 60000) 3600)) ":"
+      (pad (modulo (quotient ms 1000)  60)) "."
+      (pad (modulo ms 1000) 3)))
 
 (define (~size bs)
   (define-values (n suffix)
