@@ -1,11 +1,9 @@
+<img src="https://github.com/Bogdanp/racket-dbg/raw/master/media/screenshot.png" alt="screenshot" width="356" height="256" align="right" />
+
 # dbg
 
 A server, client and UI for remotely debugging Racket applications.
 Very much a work in progress.
-
-<center>
-  <img src="https://github.com/Bogdanp/racket-dbg/raw/master/media/screenshot.png" alt="screenshot" width="712" height="512" />
-</center>
 
 ## Usage
 ### Run a server
