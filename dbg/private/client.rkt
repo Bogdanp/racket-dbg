@@ -14,7 +14,6 @@
  async-evt
  get-info
  get-memory-use
- get-managed-item-counts
  get-object-counts)
 
 (define current-client
@@ -149,9 +148,6 @@
 
 (define (get-memory-use [c (current-client)])
   (cadr (send/sync c get-memory-use)))
-
-(define (get-managed-item-counts [c (current-client)])
-  (cadr (send/sync c get-managed-item-counts)))
 
 (define (get-object-counts [c (current-client)])
   (cadr (send/sync c get-object-counts)))

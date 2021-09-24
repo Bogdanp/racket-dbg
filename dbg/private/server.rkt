@@ -129,10 +129,6 @@
                (write/flush `(memory-use ,id ,(current-memory-use)))
                (loop)]
 
-              [`(get-managed-item-counts ,id)
-               (write/flush `(managed-item-counts ,id ,(compute-managed-item-counts)))
-               (loop)]
-
               [`(get-object-counts ,id)
                (write/flush `(object-counts ,id ,(get-object-counts)))
                (loop)]
@@ -144,24 +140,3 @@
               [message
                (write/flush `(error ,(format "invalid message: ~e" message)))
                (loop)]))))))))
-
-(define (compute-managed-item-counts [cust (current-custodian)]
-                                     [parent (current-root-custodian)])
-  (for/fold ([counts (hasheq)])
-            ([item (in-list (custodian-managed-list cust parent))])
-    (cond
-      [(custodian? item)
-       (hash-update
-        (for/hash ([(k v) (in-hash (compute-managed-item-counts item cust))])
-          (values k (+ (hash-ref counts k 0) v)))
-        'custodians add1 0)]
-      [else
-       (define-values (key default updater)
-         (cond
-           [(input-port? item)   (values 'input-ports   0 add1)]
-           [(output-port? item)  (values 'output-ports  0 add1)]
-           [(tcp-listener? item) (values 'tcp-listeners 0 add1)]
-           [(thread? item)       (values 'threads       0 add1)]
-           [(place? item)        (values 'places        0 add1)]
-           [else                 (values 'unknown       0 add1)]))
-       (hash-update counts key updater default)])))

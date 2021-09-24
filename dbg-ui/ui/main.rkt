@@ -177,35 +177,6 @@
     [else
      (text "Loading...")])))
 
-(define (custodians-tab c)
-  (define (->entries counts)
-    (list->vector
-     (sort
-      (for/list ([(k v) (in-hash counts)])
-        (cons k v))
-      #:key cdr >)))
-
-  (define/obs @counts #f)
-  (define (reload)
-    (defer (@counts . := . (get-managed-item-counts c))))
-
-  (reload)
-  (vpanel
-   (button "Reload" reload)
-   (cond-view
-    [@counts
-     (table
-      '("Kind" "Count")
-      (@counts . ~> . (λ (maybe-counts)
-                        (->entries (or maybe-counts (hasheq)))))
-      #:entry->row (λ (entry)
-                     (vector
-                      (~a (car entry))
-                      (~a (cdr entry)))))]
-
-    [else
-     (text "Loading...")])))
-
 (define (start-ui c)
   (define/obs @tab 'info)
   (define/obs @state
@@ -223,7 +194,7 @@
     #:title "Remote Debugger"
     #:size '(600 400)
     #:mixin (make-window-mixin c)
-    (let ([the-tabs '(info charts memory custodians)])
+    (let ([the-tabs '(info charts memory)])
       (tabs
        (map (compose1 string-titlecase symbol->string) the-tabs)
        (λ (event _choices index)
@@ -245,9 +216,6 @@
 
         [(memory)
          (memory-tab c)]
-
-        [(custodians)
-         (custodians-tab c)]
 
         [else
          (hpanel)]))))))

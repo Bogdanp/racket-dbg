@@ -19,7 +19,6 @@
   [async-evt (client-> evt?)]
   [get-info (client-> hash?)]
   [get-memory-use (client-> exact-positive-integer?)]
-  [get-managed-item-counts (client-> (hash/c symbol? exact-positive-integer?))]
   [get-object-counts (client-> (listof (cons/c string? (cons/c exact-nonnegative-integer?
                                                                exact-nonnegative-integer?))))]))
 

@@ -44,4 +44,4 @@
 (define (object->string o)
   (call-with-output-string
    (lambda (out)
-     (print o out))))
+     (write o out))))
