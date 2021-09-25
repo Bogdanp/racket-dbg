@@ -9,13 +9,13 @@ Very much a work in progress.
 ### Run a server
 
 ```racket
-(require debugging/server)
-(serve)
+(require (prefix-in dbg: debugging/server))
+(define dbg:stop (dbg:serve))
 ```
 
 ### Run the UI
 
-    racket -l debugging/ui
+    raco dbg
 
 ## License
 

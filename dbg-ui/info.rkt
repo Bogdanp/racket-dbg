@@ -7,3 +7,5 @@
                "gui-easy-lib"
                "plot-lib"
                "plot-gui-lib"))
+(define raco-commands
+  '(("dbg" (submod debugging/ui main) "run a remote debugger" #f)))
