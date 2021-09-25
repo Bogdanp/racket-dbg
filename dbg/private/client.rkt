@@ -1,6 +1,7 @@
 #lang racket/base
 
-(require racket/match
+(require profile/render-json
+         racket/match
          racket/tcp
          "common.rkt")
 
@@ -14,7 +15,10 @@
  async-evt
  get-info
  get-memory-use
- get-object-counts)
+ get-object-counts
+ start-profile
+ stop-profile
+ get-profile)
 
 (define current-client
   (make-parameter #f))
@@ -151,3 +155,12 @@
 
 (define (get-object-counts [c (current-client)])
   (cadr (send/sync c get-object-counts)))
+
+(define (start-profile [c (current-client)] [delay-ms 100])
+  (void (send/sync c start-profile delay-ms)))
+
+(define (stop-profile [c (current-client)])
+  (json->profile (cadr (send/sync c stop-profile))))
+
+(define (get-profile [c (current-client)])
+  (json->profile (cadr (send/sync c get-profile))))

@@ -21,7 +21,10 @@
   [get-info (client-> hash?)]
   [get-memory-use (client-> exact-positive-integer?)]
   [get-object-counts (client-> (listof (cons/c string? (cons/c exact-nonnegative-integer?
-                                                               exact-nonnegative-integer?))))]))
+                                                               exact-nonnegative-integer?))))]
+  [start-profile (case-client-> exact-nonnegative-integer? void?)]
+  [stop-profile (client-> any/c)]
+  [get-profile (client-> any/c)]))
 
 (define-syntax-rule (client-> arg/c ... res/c)
   (->* (arg/c ...) (client?) res/c))

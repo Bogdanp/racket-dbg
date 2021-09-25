@@ -1,12 +1,18 @@
 #lang racket/base
 
-(require racket/match
+(require profile/analyzer
+         profile/render-json
+         profile/sampler
+         racket/match
          racket/tcp
          "common.rkt"
          "memory.rkt")
 
 (provide
  serve)
+
+(define current-root-custodian
+  (make-parameter #f))
 
 (define system-info
   (hash-set*
@@ -16,6 +22,9 @@
 
 (define (serve #:host [host "127.0.0.1"]
                #:port [port 9011])
+  (define cust (make-custodian))
+  (current-root-custodian (current-custodian))
+  (current-custodian cust)
   (define cmd-ch (make-channel))
   (define stop-ch (make-channel))
   (define listener
@@ -63,6 +72,21 @@
     (channel-put stop-ch '(stop))
     (thread-wait thd)))
 
+(struct conn-state (sampler)
+  #:transparent)
+
+(define (make-conn-state)
+  (conn-state #f))
+
+(define (set-sampler s sampler)
+  (struct-copy conn-state s [sampler sampler]))
+
+(define (clear-sampler s)
+  (struct-copy conn-state s [sampler #f]))
+
+(define (get-profile s)
+  (profile->json (analyze-samples ((conn-state-sampler s) 'get-snapshots))))
+
 (define (handle client-in client-out server-ch)
   (define (disconnect)
     (channel-put server-ch `(unsubscribe-all ,async-ch))
@@ -70,56 +94,94 @@
     (tcp-abandon-port client-out))
   (define async-ch
     (make-channel))
+  (define message-evt
+    (handle-evt client-in read))
   (parameterize ([current-output-port client-out])
-    (let loop ()
+    (let loop ([s (make-conn-state)])
       (with-handlers ([exn:fail:network? (λ (_e) (disconnect))])
         (sync
          (handle-evt
           async-ch
           (λ (topic&data)
             (write/flush `(async ,@topic&data))
-            (loop)))
+            (loop s)))
          (handle-evt
-          client-in
-          (λ (_)
-            (match (read client-in)
-              [(? eof-object?)
-               (disconnect)]
+          message-evt
+          (match-lambda
+            [(? eof-object?)
+             (disconnect)]
 
-              [`(disconnect ,id)
-               (write/flush `(bye ,id))
-               (disconnect)]
+            [`(disconnect ,id)
+             (write/flush `(bye ,id))
+             (disconnect)]
 
-              [`(subscribe ,id ,topic)
-               (channel-put server-ch `(subscribe ,topic ,async-ch))
-               (write/flush `(ok ,id))
-               (loop)]
+            [`(subscribe ,id ,topic)
+             (channel-put server-ch `(subscribe ,topic ,async-ch))
+             (write/flush `(ok ,id))
+             (loop s)]
 
-              [`(unsubscribe ,id ,topic)
-               (channel-put server-ch `(unsubscribe ,topic ,async-ch))
-               (write/flush `(ok ,id))
-               (loop)]
+            [`(unsubscribe ,id ,topic)
+             (channel-put server-ch `(unsubscribe ,topic ,async-ch))
+             (write/flush `(ok ,id))
+             (loop s)]
 
-              [`(ping ,id)
-               (write/flush `(pong ,id))
-               (loop)]
+            [`(ping ,id)
+             (write/flush `(pong ,id))
+             (loop s)]
 
-              [`(get-info ,id)
-               (write/flush `(info ,id ,system-info))
-               (loop)]
+            [`(get-info ,id)
+             (write/flush `(info ,id ,system-info))
+             (loop s)]
 
-              [`(get-memory-use ,id)
-               (write/flush `(memory-use ,id ,(current-memory-use)))
-               (loop)]
+            [`(get-memory-use ,id)
+             (write/flush `(memory-use ,id ,(current-memory-use)))
+             (loop s)]
 
-              [`(get-object-counts ,id)
-               (write/flush `(object-counts ,id ,(get-object-counts)))
-               (loop)]
+            [`(get-object-counts ,id)
+             (write/flush `(object-counts ,id ,(get-object-counts)))
+             (loop s)]
 
-              [`(,cmd ,id ,args ...)
-               (write/flush `(error ,id ,(format "invalid message: ~e" `(,cmd ,@args))))
-               (loop)]
+            [`(start-profile ,id ,delay-ms)
+             (cond
+               [(conn-state-sampler s)
+                (write/flush `(error ,id "a profile is already running"))
+                (loop s)]
 
-              [message
-               (write/flush `(error ,(format "invalid message: ~e" message)))
-               (loop)]))))))))
+               [else
+                (define sampler
+                  (create-sampler
+                   (current-custodian)
+                   (/ delay-ms 1000.0)
+                   (current-root-custodian)))
+                (write/flush `(ok ,id))
+                (loop (set-sampler s sampler))])]
+
+            [`(get-profile ,id)
+             (cond
+               [(conn-state-sampler s)
+                (write/flush `(ok ,id ,(get-profile s)))
+                (loop s)]
+
+               [else
+                (write/flush `(error ,id "a profile is not currently running"))
+                (loop s)])]
+
+            [`(stop-profile ,id)
+             (cond
+               [(conn-state-sampler s)
+                => (λ (sampler)
+                     (sampler 'stop)
+                     (write/flush `(ok ,id ,(get-profile s)))
+                     (loop (clear-sampler s)))]
+
+               [else
+                (write/flush `(error ,id "a profile is not currently running"))
+                (loop s)])]
+
+            [`(,cmd ,id ,args ...)
+             (write/flush `(error ,id ,(format "invalid message: ~e" `(,cmd ,@args))))
+             (loop s)]
+
+            [message
+             (write/flush `(error ,(format "invalid message: ~e" message)))
+             (loop s)])))))))
