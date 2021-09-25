@@ -104,6 +104,7 @@
 (define (info-tab c)
   (define info (get-info c))
   (vpanel
+   #:margin '(5 5)
    #:alignment '(left top)
    (labeled "Operating system:" (text (~a (hash-ref info 'os*))))
    (labeled "Virtual machine:" (text (~a (hash-ref info 'vm))))
@@ -116,10 +117,11 @@
   (define/obs @hist
     (state-history (obs-peek @state)))
   (vpanel
-   (labeled "Memory use:" (text (@state . ~> . (compose1 ~size state-memory-use))))
-   (labeled "Total GC time:" (text (@state . ~> . (compose1 ~duration state-gc-duration/total))))
-   (labeled "Longest GC pause:" (text (@state . ~> . (compose1 ~ms state-gc-duration/max))))
    (vpanel
+    #:margin '(5 5)
+    (labeled "Memory use:" (text (@state . ~> . (compose1 ~size state-memory-use))))
+    (labeled "Total GC time:" (text (@state . ~> . (compose1 ~duration state-gc-duration/total))))
+    (labeled "Longest GC pause:" (text (@state . ~> . (compose1 ~ms state-gc-duration/max))))
     (hpanel
      #:stretch '(#t #f)
      (labeled
@@ -138,6 +140,8 @@
     (cond-view
      [@have-gc-data?
       (hpanel
+       #:margin '(5 5)
+       #:spacing 5
        (plot-canvas @state plot-memory-usage)
        (plot-canvas @state plot-gc-pauses))]
 
@@ -159,6 +163,7 @@
   (reload)
   (vpanel
    (hpanel
+    #:margin '(5 5)
     #:stretch '(#t #f)
     (vpanel
      #:alignment '(left center)
@@ -178,6 +183,7 @@
     [@counts
      (table
       '("Kind" "Count" "Size")
+      #:margin '(5 5)
       #:column-widths `((0 320))
       (obs-combine
        (λ (maybe-counts filter-re)
