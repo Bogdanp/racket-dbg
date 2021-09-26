@@ -25,7 +25,7 @@
 (define pen-color
   (send gui:the-color-database find-color "black"))
 (define brush-color
-  (make-object gui:color% 255 0 0 0.025))
+  (make-object gui:color% 255 0 0 0.05))
 
 (define tree-map-canvas%
   (class gui:canvas%
@@ -115,6 +115,7 @@
 
     (define/public (set-tree t)
       (set! tree t)
+      (set-scale 1/100)
       (change-scale 1.0))
 
     (define/public (set-scale s)
