@@ -33,7 +33,7 @@
    children))
 
 (define (~profile-node n [maxlen 50])
-  (define name
+  (define src
     (cond
       [(node-src n)
        => (λ (loc)
@@ -44,7 +44,13 @@
                         (srcloc-source loc)
                         (srcloc-line loc)
                         (srcloc-column loc)))))]
-      [(node-id n) => ~a]
+      [else #f]))
+  (define name
+    (cond
+      [(node-id n)
+       => (λ (id)
+            (format "~a at ~a" src id))]
+      [(node-src n) src]
       [else "???"]))
   (define len
     (string-length name))
