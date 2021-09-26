@@ -30,7 +30,9 @@
 (define tree-map-canvas%
   (class gui:canvas%
     (init-field tree scale)
-    (inherit get-view-start get-client-size get-virtual-size init-auto-scrollbars scroll refresh-now)
+    (inherit get-client-size get-virtual-size  get-view-start
+             init-auto-scrollbars scroll
+             refresh-now)
     (field [mouse-x 0]
            [mouse-y 0])
     (super-new [style '(hscroll vscroll)]
@@ -120,24 +122,28 @@
 
     (define pending-scale #f)
     (define/public (change-scale m)
-      (set! scale (* scale m))
-      (unless pending-scale
-        (define deadline (alarm-evt (+ (current-inexact-milliseconds) 16)))
-        (set! pending-scale
-              (thread
-               (λ ()
-                 (sync deadline)
-                 (define s (node-size/scaled tree scale))
-                 (define-values (x y) (get-view-start))
-                 (define-values (cw ch) (get-client-size))
-                 (define-values (vw vh) (get-virtual-size))
-                 (define-values (w h)
-                   (values (max 0 (- vw cw))
-                           (max 0 (- vh ch))))
-                 (init-auto-scrollbars s s
-                                       (if (zero? w) 0 (/ x w))
-                                       (if (zero? h) 0 (/ y h)))
-                 (set! pending-scale #f))))))))
+      (define next-scale (* scale m))
+      (define next-size (node-size/scaled tree next-scale))
+      (when (and (>  next-size 0)
+                 (<= next-size 1000000))
+        (set! scale next-scale)
+        (unless pending-scale
+          (define deadline (alarm-evt (+ (current-inexact-milliseconds) 16)))
+          (set! pending-scale
+                (thread
+                 (λ ()
+                   (sync deadline)
+                   (define s (node-size/scaled tree scale))
+                   (define-values (x y) (get-view-start))
+                   (define-values (cw ch) (get-client-size))
+                   (define-values (vw vh) (get-virtual-size))
+                   (define-values (w h)
+                     (values (max 0 (- vw cw))
+                             (max 0 (- vh ch))))
+                   (init-auto-scrollbars s s
+                                         (if (zero? w) 0 (/ x w))
+                                         (if (zero? h) 0 (/ y h)))
+                   (set! pending-scale #f)))))))))
 
 (define tree-map%
   (class* object% (view<%>)
