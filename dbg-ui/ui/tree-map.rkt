@@ -187,8 +187,8 @@
   (define (do-draw-node n x y)
     (define size (node-size/scaled n scale))
     (define children (node-children n))
-    (define child-ratios (for/list ([c (in-list children)])
-                           (/ (node-size/scaled c scale) size)))
+    (define child-sizes (for/list ([c (in-list children)])
+                           (node-size/scaled c scale)))
     (send dc draw-rectangle x y size size)
 
     (let loop ([cs children]
@@ -238,6 +238,6 @@
                (>= mouse-y y)
                (<= mouse-x (+ size x))
                (<= mouse-y (+ size y))
-               (not (ormap (λ (r) (>= r 0.9)) child-ratios)))
+               (not (ormap (λ (s) (< (- size s) 30)) child-sizes)))
       (send dc draw-text (node-name n) (+ x 5) (+ y size -18))))
   (do-draw-node n 0 0))
