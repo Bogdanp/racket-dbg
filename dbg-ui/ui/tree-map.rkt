@@ -194,52 +194,19 @@
   (define (do-draw-node n x y)
     (define size (node-size/scaled n scale))
     (define children (node-children n))
-    (define child-sizes (for/list ([c (in-list children)])
-                           (node-size/scaled c scale)))
+    (define child-sizes
+      (for/list ([c (in-list children)])
+        (node-size/scaled c scale)))
+
     (send dc draw-rectangle x y size size)
 
-    (let loop ([cs children]
-               [xs `(,x)]
-               [ys `(,y)]
-               [nx `(0)]
-               [ny `(,size)])
+    (let loop ([cs children] [x x])
       (unless (null? cs)
         (define c (car cs))
         (define s (node-size/scaled c scale))
-        (when (>= s 10)
-          (define cx (car xs))
-          (define cy (car ys))
-          (cond
-            [(<= (+ cx s)
-                 (+ x size))
-             (do-draw-node c cx cy)
-             (loop (cdr cs)
-                   (cons (+ cx s) xs)
-                   ys
-                   (cons cx nx)
-                   (cons (+ cy s) ny))]
-
-            [else
-             (define-values (y* nx* ny*)
-               (let fit ([y  (car ny)]
-                         [nx (cdr nx)]
-                         [ny (cdr ny)])
-                 (cond
-                   [(<= (+ y s) (car ny))
-                    (values y nx ny)]
-
-                   [else
-                    (fit (car ny)
-                         (cdr nx)
-                         (cdr ny))])))
-             (define cx* (cadr nx))
-             (define cy* y*)
-             (do-draw-node c cx* cy*)
-             (loop (cdr cs)
-                   (cons (+ cx* s) xs)
-                   (cons cy* ys)
-                   (cons cx* nx*)
-                   (cons (+ cy* s) ny*))]))))
+        (when (>= s 5)
+          (do-draw-node c x y)
+          (loop (cdr cs) (+ x s)))))
 
     (when (and (>= mouse-x x)
                (>= mouse-y y)
