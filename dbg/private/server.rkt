@@ -72,21 +72,6 @@
     (channel-put stop-ch '(stop))
     (thread-wait thd)))
 
-(struct conn-state (sampler)
-  #:transparent)
-
-(define (make-conn-state)
-  (conn-state #f))
-
-(define (set-sampler s sampler)
-  (struct-copy conn-state s [sampler sampler]))
-
-(define (clear-sampler s)
-  (struct-copy conn-state s [sampler #f]))
-
-(define (get-profile s)
-  (profile->json (analyze-samples ((conn-state-sampler s) 'get-snapshots))))
-
 (define (handle client-in client-out server-ch)
   (define (disconnect)
     (channel-put server-ch `(unsubscribe-all ,async-ch))
@@ -97,7 +82,7 @@
   (define message-evt
     (handle-evt client-in read))
   (parameterize ([current-output-port client-out])
-    (let loop ([s (make-conn-state)])
+    (let loop ([s (make-state)])
       (with-handlers ([exn:fail:network? (λ (_e) (disconnect))])
         (sync
          (handle-evt
@@ -141,9 +126,9 @@
              (write/flush `(object-counts ,id ,(get-object-counts)))
              (loop s)]
 
-            [`(start-profile ,id ,delay-ms)
+            [`(start-profile ,id ,delay-ms ,errortrace?)
              (cond
-               [(conn-state-sampler s)
+               [(state-sampler s)
                 (write/flush `(error ,id "a profile is already running"))
                 (loop s)]
 
@@ -152,13 +137,14 @@
                   (create-sampler
                    (current-custodian)
                    (/ delay-ms 1000.0)
-                   (current-root-custodian)))
+                   (current-root-custodian)
+                   #:use-errortrace? errortrace?))
                 (write/flush `(ok ,id))
                 (loop (set-sampler s sampler))])]
 
             [`(get-profile ,id)
              (cond
-               [(conn-state-sampler s)
+               [(state-sampler s)
                 (write/flush `(ok ,id ,(get-profile s)))
                 (loop s)]
 
@@ -168,7 +154,7 @@
 
             [`(stop-profile ,id)
              (cond
-               [(conn-state-sampler s)
+               [(state-sampler s)
                 => (λ (sampler)
                      (sampler 'stop)
                      (write/flush `(ok ,id ,(get-profile s)))
@@ -185,3 +171,22 @@
             [message
              (write/flush `(error ,(format "invalid message: ~e" message)))
              (loop s)])))))))
+
+
+;; state ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(struct state (sampler)
+  #:transparent)
+
+(define (make-state)
+  (state #f))
+
+(define (set-sampler s sampler)
+  (struct-copy state s [sampler sampler]))
+
+(define (clear-sampler s)
+  (struct-copy state s [sampler #f]))
+
+(define (get-profile s)
+  (define snapshots ((state-sampler s) 'get-snapshots))
+  (profile->json (analyze-samples snapshots)))

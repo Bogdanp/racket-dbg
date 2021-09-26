@@ -156,8 +156,8 @@
 (define (get-object-counts [c (current-client)])
   (cadr (send/sync c get-object-counts)))
 
-(define (start-profile [c (current-client)] [delay-ms 100])
-  (void (send/sync c start-profile delay-ms)))
+(define (start-profile [c (current-client)] [delay-ms 1] [errortrace? #f])
+  (void (send/sync c start-profile delay-ms errortrace?)))
 
 (define (stop-profile [c (current-client)])
   (json->profile (cadr (send/sync c stop-profile))))

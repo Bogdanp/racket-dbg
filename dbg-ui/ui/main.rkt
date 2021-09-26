@@ -2,12 +2,15 @@
 
 (require debugging/client
          plot
+         (prefix-in prof: profile/analyzer)
          racket/class
          racket/format
          racket/gui/easy
          racket/gui/easy/operator
          racket/list
-         racket/match)
+         racket/match
+         "profile.rkt"
+         "tree-map.rkt")
 
 (provide
  start-ui)
@@ -199,6 +202,62 @@
     [else
      (text "Loading...")])))
 
+(struct recording (name prof)
+  #:transparent)
+
+(define (performance-tab c)
+  (define/obs @recordings null)
+  (define/obs @recording? #f)
+  (define/obs @errortrace? #f)
+  (define (toggle-recording)
+    (@recording? . <~ . (λ (on?)
+                          (begin0 (not on?)
+                            (cond
+                              [on?
+                               (@recordings . <~ . (λ (rs)
+                                                     (define name (format "Recording #~a" (add1 (length rs))))
+                                                     (define prof (stop-profile c))
+                                                     (append rs `(,(recording name prof)))))]
+                              [else
+                               (start-profile c 1 (obs-peek @errortrace?))])))))
+  (hpanel
+   (vpanel
+    (hpanel
+     #:stretch '(#t #f)
+     (button
+      (@recording? . ~> . (λ (on?)
+                            (if on?
+                                "Stop recording..."
+                                "Start recording...")))
+      (λ () (defer (toggle-recording))))
+     (checkbox
+      #:label "Errortrace?"
+      (λ:= @errortrace?)))
+    (table
+     '("Recording")
+     (@recordings . ~> . list->vector)
+     #:entry->row (λ (r) (vector (recording-name r)))
+     (λ (event entries selection)
+       (case event
+         [(dclick)
+          (define rec (vector-ref entries selection))
+          (define prof (recording-prof rec))
+          (define nodes (prof:profile-nodes prof))
+          (define/obs @tree (profile-node->tree-map-tree prof (car nodes)))
+          (render
+           (dialog
+            #:title (recording-name rec)
+            #:size '(800 600)
+            (vpanel
+             (labeled
+              "Start node:"
+              (choice
+               (prof:profile-nodes prof)
+               #:choice->label ~profile-node
+               (λ (n)
+                 (@tree . := . (profile-node->tree-map-tree prof n)))))
+             (tree-map @tree))))]))))))
+
 (define (start-ui c)
   (define/obs @tab 'info)
   (define/obs @state
@@ -216,7 +275,7 @@
     #:title "Remote Debugger"
     #:size '(600 400)
     #:mixin (make-window-mixin c)
-    (let ([the-tabs '(info charts memory)])
+    (let ([the-tabs '(info charts memory performance)])
       (tabs
        (map (compose1 string-titlecase symbol->string) the-tabs)
        (λ (event _choices index)
@@ -238,6 +297,9 @@
 
         [(memory)
          (memory-tab c)]
+
+        [(performance)
+         (performance-tab c)]
 
         [else
          (hpanel)]))))))

@@ -22,7 +22,7 @@
   [get-memory-use (client-> exact-positive-integer?)]
   [get-object-counts (client-> (listof (cons/c string? (cons/c exact-nonnegative-integer?
                                                                exact-nonnegative-integer?))))]
-  [start-profile (case-client-> exact-nonnegative-integer? void?)]
+  [start-profile (->* () (client? exact-nonnegative-integer? boolean?) void?)]
   [stop-profile (client-> any/c)]
   [get-profile (client-> any/c)]))
 
