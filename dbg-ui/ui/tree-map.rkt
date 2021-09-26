@@ -115,7 +115,7 @@
 
     (define/public (set-tree t)
       (set! tree t)
-      (set-scale 1/100)
+      (set-scale 1/10)
       (change-scale 1.0))
 
     (define/public (set-scale s)
@@ -168,7 +168,7 @@
     (define/public (destroy _v)
       (void))))
 
-(define (tree-map @tree [@scale 1/100])
+(define (tree-map @tree [@scale 1/10])
   (new tree-map%
        [@tree (@ @tree)]
        [@scale (@ @scale)]))
