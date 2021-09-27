@@ -3,7 +3,8 @@
 (require racket/class
          (prefix-in gui: racket/gui)
          racket/gui/easy
-         racket/gui/easy/operator)
+         racket/gui/easy/operator
+         racket/match)
 
 ;; node ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -21,6 +22,29 @@
 
 (provide
  tree-map)
+
+(struct v2 (x y)
+  #:transparent)
+
+(define (v2zero? v)
+  (and (zero? (v2-x v))
+       (zero? (v2-y v))))
+
+(define (v2- a b)
+  (v2 (- (v2-x a) (v2-x b))
+      (- (v2-y a) (v2-y b))))
+
+(define (v2+ a b)
+  (v2 (+ (v2-x a) (v2-x b))
+      (+ (v2-y a) (v2-y b))))
+
+(define (v2* v n)
+  (v2 (* (v2-x v) n)
+      (* (v2-y v) n)))
+
+(define (mouse-event->v2 e)
+  (v2 (send e get-x)
+      (send e get-y)))
 
 (define pen-color
   (send gui:the-color-database find-color "black"))
@@ -51,10 +75,13 @@
         [(wheel-up)   (change-scale 1.05)]
         [(wheel-down) (change-scale (/ 1 1.05))]))
 
+    (define (make-deadline-evt)
+      (alarm-evt (+ (current-inexact-milliseconds) 8)))
+
     (define pending-draw #f)
     (define (schedule-draw)
       (unless pending-draw
-        (define deadline (alarm-evt (+ (current-inexact-milliseconds) 16)))
+        (define deadline (make-deadline-evt))
         (set! pending-draw
               (thread
                (λ ()
@@ -62,28 +89,44 @@
                  (refresh-now)
                  (set! pending-draw #f))))))
 
-    (define drag-events null)
+    (define (near-zero? x)
+      (< (abs x) 0.01))
+
+    (define dragging? #f)
+    (define drag-last #f)
+    (define drag-velocity (v2 0 0))
     (define (push-drag-event e)
-      (set! drag-events (cons e drag-events)))
+      (cond
+        [drag-last
+         (define ev2 (mouse-event->v2 e))
+         (define dt
+           (- (send e get-time-stamp)
+              (send drag-last get-time-stamp)))
+         (define accel
+           (round (if (zero? dt) 4 (max 1 (/ 32 dt)))))
+         (set! drag-velocity
+               (v2+ drag-velocity
+                    (v2* (v2- (mouse-event->v2 drag-last) ev2) accel)))
+         (set! drag-last e)]
+        [else
+         (set! drag-last e)]))
     (define pending-drag-flush #f)
-    (define (schedule-drag-flush)
+    (define (schedule-drag-flush [step 0])
       (unless pending-drag-flush
-        (define deadline (alarm-evt (+ (current-inexact-milliseconds) 16)))
+        (define deadline (make-deadline-evt))
         (set! pending-drag-flush
               (thread
                (λ ()
                  (sync deadline)
                  (define-values (dx dy)
-                   (let ([es (reverse drag-events)])
-                     (for/fold ([dx 0]
-                                [dy 0])
-                               ([e0 (in-list es)]
-                                [e1 (in-list (cdr es))])
-                       (values
-                        (+ dx (- (send e0 get-x)
-                                 (send e1 get-x)))
-                        (+ dy (- (send e0 get-y)
-                                 (send e1 get-y)))))))
+                   (match drag-velocity
+                     [(v2 dx dy)
+                      #:when dragging?
+                      (values dx dy)]
+
+                     [(v2 dx dy)
+                      (values (* dx (/ 0.9 (expt 1.10 step)))
+                              (* dy (/ 0.9 (expt 1.10 step))))]))
                  (define-values (x y)
                    (get-view-start))
                  (define-values (cw ch)
@@ -95,21 +138,35 @@
                            (max 0 (- vh ch))))
                  (define new-x (min w (max 0 (+ x dx))))
                  (define new-y (min h (max 0 (+ y dy))))
-                 (scroll
-                  (if (zero? w) 0 (/ new-x w))
-                  (if (zero? h) 0 (/ new-y h)))
-                 (set! drag-events null)
-                 (set! pending-drag-flush #f))))))
+                 (define new-h (if (zero? w) 0 (/ new-x w)))
+                 (define new-v (if (zero? h) 0 (/ new-y h)))
+                 (scroll new-h new-v)
+                 (set! pending-drag-flush #f)
+                 (cond
+                   [dragging?
+                    (set! drag-velocity (v2 0 0))]
+                   [else
+                    (set! drag-velocity
+                          (v2 (if (near-zero? dx) 0 dx)
+                              (if (near-zero? dy) 0 dy)))
+                    (cond
+                      [(v2zero? drag-velocity) (set! drag-last #f)]
+                      [else (schedule-drag-flush (add1 step))])]))))))
 
     (define/override (on-event e)
       (set! mouse-x (send e get-x))
       (set! mouse-y (send e get-y))
       (case (send e get-event-type)
         [(left-down)
+         (set! dragging? #t)
          (push-drag-event e)]
+        [(left-up)
+         (set! dragging? #f)
+         (push-drag-event e)
+         (schedule-drag-flush)]
         [(motion)
          (schedule-draw)
-         (when (send e dragging?)
+         (when dragging?
            (push-drag-event e)
            (schedule-drag-flush))]))
 
@@ -129,7 +186,7 @@
                  (<= next-size 1000000))
         (set! scale next-scale)
         (unless pending-scale
-          (define deadline (alarm-evt (+ (current-inexact-milliseconds) 16)))
+          (define deadline (make-deadline-evt))
           (set! pending-scale
                 (thread
                  (λ ()
