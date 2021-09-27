@@ -240,8 +240,38 @@
             (node "b" 8000
                   (list
                    (node "d" 5000 null)
-                   (node "e" 1000 null)))
+                   (node "e" 1000 null)
+                   (node "f"  500 null)
+                   (node "g"  100 null)))
             (node "c" 2000 null)))
+     1/50)))
+  (render
+   (window
+    #:size '(400 400)
+    (tree-map
+     (node "a" 10000
+           (list
+            (node "b" 4000
+                  (list
+                   (node "c" 2000 null)
+                   (node "d" 1500 null)
+                   (node "e"  250 null)
+                   (node "f"  250 null)))))
+     1/50)))
+  (render
+   (window
+    #:size '(400 400)
+    (tree-map
+     (node "a" 10000
+           (list
+            (node "b" 5000
+                  (list
+                   (node "c" 2500 null)
+                   (node "d" 1250 null)
+                   (node "e"  625 null)
+                   (node "f"  313 null)
+                   (node "g"  157 null)
+                   (node "h"   79 null)))))
      1/50))))
 
 
@@ -257,13 +287,19 @@
 
     (send dc draw-rectangle x y size size)
 
-    (let loop ([cs children] [x x])
+    (let loop ([cs children]
+               [nx `(,x)]
+               [ny `(,y)])
       (unless (null? cs)
         (define c (car cs))
         (define s (node-size/scaled c scale))
         (when (>= s 5)
-          (do-draw-node c x y)
-          (loop (cdr cs) (+ x s)))))
+          (define cx (car nx))
+          (define cy (car ny))
+          (do-draw-node c cx cy)
+          (loop (cdr cs)
+                (append (cdr nx) `(,(+ cx s) ,cx))
+                (append (cdr ny) `(,cy ,(+ cy s)))))))
 
     (when (and (>= mouse-x x)
                (>= mouse-y y)
