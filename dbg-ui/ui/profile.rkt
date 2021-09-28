@@ -15,12 +15,12 @@
      (for*/list ([e (in-list (node-callees n))]
                  [n (in-value (edge-callee e))])
        (tm:node
-        (~profile-node n)
+        n
         (edge-caller-time e)
         null))
      #:key tm:node-size >))
   (tm:node
-   (~profile-node n)
+   n
    (apply + (map tm:node-size children))
    children))
 

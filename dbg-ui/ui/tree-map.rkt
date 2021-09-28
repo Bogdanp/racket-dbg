@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require racket/class
+         racket/format
          (prefix-in gui: racket/gui)
          racket/gui/easy
          racket/gui/easy/operator
@@ -11,7 +12,7 @@
 (provide
  (struct-out node))
 
-(struct node (name size children)
+(struct node (data size children)
   #:transparent)
 
 (define (node-size/scaled n s)
@@ -53,7 +54,9 @@
 
 (define tree-map-canvas%
   (class gui:canvas%
-    (init-field tree scale)
+    (init-field tree scale
+                [action void]
+                [format-data ~a])
     (inherit get-client-size get-virtual-size  get-view-start
              init-auto-scrollbars scroll
              refresh-now)
@@ -63,9 +66,24 @@
                [paint-callback (λ (_self dc)
                                  (send dc set-pen pen-color 1 'solid)
                                  (send dc set-brush brush-color 'solid)
-                                 (define-values (vx vy)
-                                   (get-view-start))
-                                 (draw-node tree dc 0 0 (+ vx mouse-x) (+ vy mouse-y) scale))])
+                                 (define rects (compute-rects tree 0 0 scale))
+                                 (for ([r (in-list rects)])
+                                   (match-define (rect _ x y w h) r)
+                                   (send dc draw-rectangle x y w h))
+
+                                 (define-values (vx vy) (get-view-start))
+                                 (define-values (mx my)
+                                   (values (+ vx mouse-x)
+                                           (+ vy mouse-y)))
+                                 (define best-match
+                                   (for/last ([r (in-list rects)] #:when (rect-contains? r mx my))
+                                     r))
+                                 (when best-match
+                                   (match-define (rect data x y _w h) best-match)
+                                   (send dc draw-text
+                                         (format-data data)
+                                         (+ x 5)
+                                         (- (+ y h) 18) my)))])
 
     (define size (node-size/scaled tree scale))
     (init-auto-scrollbars size size 0 0)
@@ -154,6 +172,19 @@
              [(v2zero? drag-velocity) (set! drag-last #f)]
              [else (schedule-drag-flush (add1 step))])])))
 
+    (define (find-best-match)
+      (define rects (compute-rects tree 0 0 scale))
+      (for/last ([r (in-list rects)]
+                 #:when (rect-contains? r mouse-x mouse-y))
+        r))
+
+    (define last-click #f)
+    (define (double-click? e)
+      (define delta
+        (and last-click
+             (- (send e get-time-stamp)
+                (send last-click get-time-stamp))))
+      (and delta (< delta 200)))
     (define/override (on-event e)
       (set! mouse-x (send e get-x))
       (set! mouse-y (send e get-y))
@@ -163,9 +194,17 @@
          (set! drag-velocity (v2 0 0))
          (push-drag-event e)]
         [(left-up)
+         (when (double-click? e)
+           (define bm (find-best-match))
+           (action 'dclick (and bm (rect-data bm))))
+         (set! last-click e)
+
          (set! dragging? #f)
          (push-drag-event e)
          (schedule-drag-flush)]
+        [(right-up)
+         (define bm (find-best-match))
+         (action 'rclick (and bm (rect-data bm)))]
         [(motion)
          (schedule-draw)
          (when dragging?
@@ -201,7 +240,7 @@
 
 (define tree-map%
   (class* object% (view<%>)
-    (init-field @tree @scale)
+    (init-field @tree @scale action format-data)
     (super-new)
 
     (define/public (dependencies)
@@ -211,6 +250,8 @@
       (new tree-map-canvas%
            [tree (obs-peek @tree)]
            [scale (obs-peek @scale)]
+           [action action]
+           [format-data format-data]
            [parent parent]))
 
     (define/public (update v what val)
@@ -221,16 +262,22 @@
     (define/public (destroy _v)
       (void))))
 
-(define (tree-map @tree [@scale 1/10])
+(define (tree-map @tree
+                  #:scale [@scale 1/10]
+                  #:action [action void]
+                  #:data->label [data->label ~a])
   (new tree-map%
        [@tree (@ @tree)]
-       [@scale (@ @scale)]))
+       [@scale (@ @scale)]
+       [action action]
+       [format-data data->label]))
 
 (module+ test
   (render
    (window
     #:size '(400 400)
     (tree-map
+     #:scale 1/50
      (node "a" 10000
            (list
             (node "b" 8000
@@ -239,12 +286,12 @@
                    (node "e" 1000 null)
                    (node "f"  500 null)
                    (node "g"  100 null)))
-            (node "c" 2000 null)))
-     1/50)))
+            (node "c" 2000 null))))))
   (render
    (window
     #:size '(400 400)
     (tree-map
+     #:scale 1/50
      (node "a" 10000
            (list
             (node "b" 4000
@@ -252,12 +299,12 @@
                    (node "c" 2000 null)
                    (node "d" 1500 null)
                    (node "e"  250 null)
-                   (node "f"  250 null)))))
-     1/50)))
+                   (node "f"  250 null))))))))
   (render
    (window
     #:size '(400 400)
     (tree-map
+     #:scale 1/50
      (node "a" 10000
            (list
             (node "b" 5000
@@ -268,39 +315,65 @@
                    (node "f"  313 null)
                    (node "g"  157 null)
                    (node "h"   79 null)))))
-     1/50))))
+     #:action (λ (event data)
+                (printf "event: ~a data: ~s~n" event data))))))
 
 
 ;; draw ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (draw-node n dc x y mouse-x mouse-y scale)
-  (define (do-draw-node n x y)
-    (define size (node-size/scaled n scale))
-    (define children (node-children n))
-    (define child-sizes
-      (for/list ([c (in-list children)])
-        (node-size/scaled c scale)))
+(struct rect (data x y w h)
+  #:transparent)
 
-    (send dc draw-rectangle x y size size)
+(define (rect-contains? r x y)
+  (match-define (rect _ rx ry w h) r)
+  (and (>= x rx)
+       (>= y ry)
+       (<= x (+ rx w))
+       (<= y (+ ry h))))
 
-    (let loop ([cs children]
-               [nx `(,x)]
-               [ny `(,y)])
-      (unless (null? cs)
-        (define c (car cs))
-        (define s (node-size/scaled c scale))
-        (when (>= s 5)
-          (define cx (car nx))
-          (define cy (car ny))
-          (do-draw-node c cx cy)
-          (loop (cdr cs)
-                (append (cdr nx) `(,(+ cx s) ,cx))
-                (append (cdr ny) `(,cy ,(+ cy s)))))))
+(define (compute-rects n x y scale [cutoff 5])
+  (define s (node-size/scaled n scale))
+  (define r (rect (node-data n) x y s s))
+  (cond
+    [(< s cutoff) null]
+    [else
+     (define rectss
+       (let loop ([cs (node-children n)]
+                  [nx `(,x)]
+                  [ny `(,y)])
+         (cond
+           [(null? cs) null]
+           [else
+            (define c (car cs))
+            (define s (node-size/scaled c scale))
+            (define cx (car nx))
+            (define cy (car ny))
+            (append
+             (compute-rects c cx cy scale)
+             (loop (cdr cs)
+                   (append (cdr nx) `(,(+ cx s) ,cx))
+                   (append (cdr ny) `(,cy ,(+ cy s)))))])))
+     (list* r (append rectss))]))
 
-    (when (and (>= mouse-x x)
-               (>= mouse-y y)
-               (<= mouse-x (+ size x))
-               (<= mouse-y (+ size y))
-               (not (ormap (λ (s) (< (- size s) 30)) child-sizes)))
-      (send dc draw-text (node-name n) (+ x 5) (+ y size -18))))
-  (do-draw-node n 0 0))
+(module+ test
+  (require rackunit)
+  (check-equal?
+   (compute-rects
+    (node "a" 10000
+          (list
+           (node "b" 8000
+                 (list
+                  (node "d" 5000 null)
+                  (node "e" 1000 null)
+                  (node "f"  500 null)
+                  (node "g"  100 null)))
+           (node "c" 2000 null)))
+    0 0 1)
+   (list
+    (rect "a"    0    0 10000 10000)
+    (rect "b"    0    0  8000  8000)
+    (rect "d"    0    0  5000  5000)
+    (rect "e" 5000    0  1000  1000)
+    (rect "f"    0 5000   500   500)
+    (rect "g" 6000    0   100   100)
+    (rect "c" 8000    0  2000  2000))))
