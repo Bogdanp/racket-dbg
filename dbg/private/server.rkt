@@ -70,7 +70,8 @@
              (loop subscriptions))))))))
   (λ ()
     (channel-put stop-ch '(stop))
-    (thread-wait thd)))
+    (thread-wait thd)
+    (tcp-close listener)))
 
 (define (handle client-in client-out server-ch)
   (define (disconnect)
