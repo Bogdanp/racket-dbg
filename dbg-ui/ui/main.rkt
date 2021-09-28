@@ -242,8 +242,8 @@
          [(dclick)
           (define rec (vector-ref entries selection))
           (define prof (recording-prof rec))
-          (define nodes (prof:profile-nodes prof))
-          (define/obs @tree (profile-node->tree-map-tree prof (car nodes)))
+          (define nodes (sort (prof:profile-nodes prof) #:key prof:node-total >))
+          (define/obs @tree (profile-node->tree-map-tree (car nodes)))
           (render
            (dialog
             #:title (recording-name rec)
@@ -255,7 +255,7 @@
                (prof:profile-nodes prof)
                #:choice->label ~profile-node
                (λ (n)
-                 (@tree . := . (profile-node->tree-map-tree prof n)))))
+                 (@tree . := . (profile-node->tree-map-tree n)))))
              (tree-map @tree))))]))))))
 
 (define (start-ui c)

@@ -9,27 +9,19 @@
  profile-node->tree-map-tree
  ~profile-node)
 
-(define (profile-node->tree-map-tree prof n)
-  (define seen (make-hasheq))
-  (hash-set! seen n #t)
-  (hash-set! seen (profile-*-node prof) #t)
+(define (profile-node->tree-map-tree n)
   (define children
-    (let loop ([edges (node-callees n)])
-      (sort
-       (for*/list ([e (in-list edges)]
-                   [n (in-value (edge-callee e))]
-                   #:unless (hash-has-key? seen n))
-         (hash-set! seen n #t)
-         (define children
-           (loop (node-callees n)))
-         (tm:node
-          (~profile-node n)
-          (apply + (node-self n) (map tm:node-size children))
-          children))
-       #:key tm:node-size >)))
+    (sort
+     (for*/list ([e (in-list (node-callees n))]
+                 [n (in-value (edge-callee e))])
+       (tm:node
+        (~profile-node n)
+        (edge-caller-time e)
+        null))
+     #:key tm:node-size >))
   (tm:node
    (~profile-node n)
-   (apply + (node-self n) (map tm:node-size children))
+   (apply + (map tm:node-size children))
    children))
 
 (define (~profile-node n [maxlen 50])
