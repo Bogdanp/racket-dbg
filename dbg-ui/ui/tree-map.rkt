@@ -75,19 +75,25 @@
         [(wheel-up)   (change-scale 1.05)]
         [(wheel-down) (change-scale (/ 1 1.05))]))
 
-    (define (make-deadline-evt)
-      (alarm-evt (+ (current-inexact-milliseconds) 8)))
+    (define-syntax-rule (with-scheduled-cb/no-reset id e0 e ...)
+      (unless id
+        (define deadline
+          (alarm-evt (+ (current-inexact-milliseconds) 8)))
+        (set! id (thread
+                  (λ ()
+                    (sync deadline)
+                    (gui:queue-callback
+                     (λ () e0 e ...)))))))
+
+    (define-syntax-rule (with-scheduled-cb id e0 e ...)
+      (with-scheduled-cb/no-reset id
+        e0 e ...
+        (set! id #f)))
 
     (define pending-draw #f)
     (define (schedule-draw)
-      (unless pending-draw
-        (define deadline (make-deadline-evt))
-        (set! pending-draw
-              (thread
-               (λ ()
-                 (sync deadline)
-                 (refresh-now)
-                 (set! pending-draw #f))))))
+      (with-scheduled-cb pending-draw
+        (refresh-now)))
 
     (define (near-zero? x)
       (< (abs x) 0.01))
@@ -112,46 +118,41 @@
          (set! drag-last e)]))
     (define pending-drag-flush #f)
     (define (schedule-drag-flush [step 0])
-      (unless pending-drag-flush
-        (define deadline (make-deadline-evt))
-        (set! pending-drag-flush
-              (thread
-               (λ ()
-                 (sync deadline)
-                 (define-values (dx dy)
-                   (match drag-velocity
-                     [(v2 dx dy)
-                      #:when dragging?
-                      (values dx dy)]
+      (with-scheduled-cb/no-reset pending-drag-flush
+        (define-values (dx dy)
+          (match drag-velocity
+            [(v2 dx dy)
+             #:when dragging?
+             (values dx dy)]
 
-                     [(v2 dx dy)
-                      (values (* dx (/ 0.9 (expt 1.10 step)))
-                              (* dy (/ 0.9 (expt 1.10 step))))]))
-                 (define-values (x y)
-                   (get-view-start))
-                 (define-values (cw ch)
-                   (get-client-size))
-                 (define-values (vw vh)
-                   (get-virtual-size))
-                 (define-values (w h)
-                   (values (max 0 (- vw cw))
-                           (max 0 (- vh ch))))
-                 (define new-x (min w (max 0 (+ x dx))))
-                 (define new-y (min h (max 0 (+ y dy))))
-                 (define new-h (if (zero? w) 0 (/ new-x w)))
-                 (define new-v (if (zero? h) 0 (/ new-y h)))
-                 (scroll new-h new-v)
-                 (set! pending-drag-flush #f)
-                 (cond
-                   [dragging?
-                    (set! drag-velocity (v2 0 0))]
-                   [else
-                    (set! drag-velocity
-                          (v2 (if (near-zero? dx) 0 dx)
-                              (if (near-zero? dy) 0 dy)))
-                    (cond
-                      [(v2zero? drag-velocity) (set! drag-last #f)]
-                      [else (schedule-drag-flush (add1 step))])]))))))
+            [(v2 dx dy)
+             (values (* dx (/ 0.9 (expt 1.10 step)))
+                     (* dy (/ 0.9 (expt 1.10 step))))]))
+        (define-values (x y)
+          (get-view-start))
+        (define-values (cw ch)
+          (get-client-size))
+        (define-values (vw vh)
+          (get-virtual-size))
+        (define-values (w h)
+          (values (max 0 (- vw cw))
+                  (max 0 (- vh ch))))
+        (define new-x (min w (max 0 (+ x dx))))
+        (define new-y (min h (max 0 (+ y dy))))
+        (define new-h (if (zero? w) 0 (/ new-x w)))
+        (define new-v (if (zero? h) 0 (/ new-y h)))
+        (scroll new-h new-v)
+        (set! pending-drag-flush #f)
+        (cond
+          [dragging?
+           (set! drag-velocity (v2 0 0))]
+          [else
+           (set! drag-velocity
+                 (v2 (if (near-zero? dx) 0 dx)
+                     (if (near-zero? dy) 0 dy)))
+           (cond
+             [(v2zero? drag-velocity) (set! drag-last #f)]
+             [else (schedule-drag-flush (add1 step))])])))
 
     (define/override (on-event e)
       (set! mouse-x (send e get-x))
@@ -159,6 +160,7 @@
       (case (send e get-event-type)
         [(left-down)
          (set! dragging? #t)
+         (set! drag-velocity (v2 0 0))
          (push-drag-event e)]
         [(left-up)
          (set! dragging? #f)
@@ -185,23 +187,17 @@
       (when (and (>  next-size 0)
                  (<= next-size 1000000))
         (set! scale next-scale)
-        (unless pending-scale
-          (define deadline (make-deadline-evt))
-          (set! pending-scale
-                (thread
-                 (λ ()
-                   (sync deadline)
-                   (define s (node-size/scaled tree scale))
-                   (define-values (x y) (get-view-start))
-                   (define-values (cw ch) (get-client-size))
-                   (define-values (vw vh) (get-virtual-size))
-                   (define-values (w h)
-                     (values (max 0 (- vw cw))
-                             (max 0 (- vh ch))))
-                   (init-auto-scrollbars s s
-                                         (if (zero? w) 0 (/ x w))
-                                         (if (zero? h) 0 (/ y h)))
-                   (set! pending-scale #f)))))))))
+        (with-scheduled-cb pending-scale
+          (define s (node-size/scaled tree scale))
+          (define-values (x y) (get-view-start))
+          (define-values (cw ch) (get-client-size))
+          (define-values (vw vh) (get-virtual-size))
+          (define-values (w h)
+            (values (max 0 (- vw cw))
+                    (max 0 (- vh ch))))
+          (init-auto-scrollbars s s
+                                (if (zero? w) 0 (/ x w))
+                                (if (zero? h) 0 (/ y h))))))))
 
 (define tree-map%
   (class* object% (view<%>)
