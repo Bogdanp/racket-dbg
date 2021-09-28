@@ -252,11 +252,30 @@
              (labeled
               "Start node:"
               (choice
-               (prof:profile-nodes prof)
-               #:choice->label ~profile-node
+               nodes
+               #:choice->label (λ (n)
+                                 (format "~a (~a)"
+                                         (~profile-node n)
+                                         (prof:node-total n)))
+               #:selection (@tree . ~> . node-data)
                (λ (n)
                  (@tree . := . (profile-node->tree-map-tree n)))))
-             (tree-map @tree))))]))))))
+             (let ([st null])
+               (tree-map
+                @tree
+                #:scale 1
+                #:action (λ (e n)
+                           (case e
+                             [(dclick)
+                              (when n
+                                (@tree . <~ . (λ (tree)
+                                                (set! st (cons tree st))
+                                                (profile-node->tree-map-tree n))))]
+                             [(rclick)
+                              (unless (null? st)
+                                (@tree . := . (car st))
+                                (set! st (cdr st)))]))
+                #:data->label ~profile-node)))))]))))))
 
 (define (start-ui c)
   (define/obs @tab 'info)
