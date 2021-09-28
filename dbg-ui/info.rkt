@@ -5,7 +5,9 @@
 (define deps '("base"
                "dbg"
                "gui-easy-lib"
+               "gui-lib"
                "plot-lib"
-               "plot-gui-lib"))
+               "plot-gui-lib"
+               "profile-lib"))
 (define raco-commands
   '(("dbg" (submod debugging/ui main) "run a remote debugger" #f)))
