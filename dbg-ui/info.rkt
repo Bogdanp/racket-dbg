@@ -9,5 +9,6 @@
                "plot-lib"
                "plot-gui-lib"
                "profile-lib"))
+(define build-deps '("rackunit-lib"))
 (define raco-commands
   '(("dbg" (submod debugging/ui main) "run a remote debugger" #f)))
