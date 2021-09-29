@@ -65,6 +65,8 @@
          (with-handlers ([exn:fail:network?
                           (λ (e)
                             (log-error "connection error: ~a" (exn-message e))
+                            (tcp-abandon-port in)
+                            (tcp-abandon-port out)
                             (loop #f seq cmds))])
            (apply
             sync
