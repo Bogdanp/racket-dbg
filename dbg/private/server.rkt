@@ -27,51 +27,53 @@
   (current-custodian cust)
   (define cmd-ch (make-channel))
   (define stop-ch (make-channel))
-  (define listener
-    (tcp-listen port 128 #t host))
-  (define thd
-    (thread
-     (lambda ()
-       (define gc-info-evt
-         (make-gc-info-evt))
-       (let loop ([subscriptions (hasheq)])
-         (sync
-          (handle-evt stop-ch void)
-          (handle-evt
-           listener
-           (λ (_)
-             (define-values (in out)
-               (tcp-accept listener))
-             (thread (λ () (handle in out cmd-ch)))
-             (loop subscriptions)))
-          (handle-evt
-           cmd-ch
-           (λ (cmd)
-             (match cmd
-               [`(subscribe ,topic ,ch)
-                (loop (hash-update subscriptions topic (λ (chs) (cons ch chs)) null))]
+  (define server-cust (make-custodian))
+  (parameterize ([current-custodian server-cust])
+    (define listener
+      (tcp-listen port 128 #t host))
+    (define thd
+      (thread
+       (lambda ()
+         (define gc-info-evt
+           (make-gc-info-evt))
+         (let loop ([subscriptions (hasheq)])
+           (sync
+            (handle-evt stop-ch void)
+            (handle-evt
+             listener
+             (λ (_)
+               (define-values (in out)
+                 (tcp-accept listener))
+               (thread (λ () (handle in out cmd-ch)))
+               (loop subscriptions)))
+            (handle-evt
+             cmd-ch
+             (λ (cmd)
+               (match cmd
+                 [`(subscribe ,topic ,ch)
+                  (loop (hash-update subscriptions topic (λ (chs) (cons ch chs)) null))]
 
-               [`(unsubscribe ,topic ,ch)
-                (loop (hash-update subscriptions topic (λ (chs) (remove ch chs)) null))]
+                 [`(unsubscribe ,topic ,ch)
+                  (loop (hash-update subscriptions topic (λ (chs) (remove ch chs)) null))]
 
-               [`(unsubscribe-all ,ch)
-                (loop (for/hash ([(topic chs) (in-hash subscriptions)])
-                        (values topic (remove ch chs))))]
+                 [`(unsubscribe-all ,ch)
+                  (loop (for/hash ([(topic chs) (in-hash subscriptions)])
+                          (values topic (remove ch chs))))]
 
-               [_
-                (log-warning "invalid command: ~e" cmd)
-                (loop subscriptions)])))
-          (handle-evt
-           gc-info-evt
-           (λ (data)
-             (define ts (/ (current-inexact-milliseconds) 1000))
-             (for ([ch (in-list (hash-ref subscriptions 'gc null))])
-               (sync/timeout 0 (channel-put-evt ch `(gc ,ts ,data))))
-             (loop subscriptions))))))))
-  (λ ()
-    (channel-put stop-ch '(stop))
-    (thread-wait thd)
-    (tcp-close listener)))
+                 [_
+                  (log-warning "invalid command: ~e" cmd)
+                  (loop subscriptions)])))
+            (handle-evt
+             gc-info-evt
+             (λ (data)
+               (define ts (/ (current-inexact-milliseconds) 1000))
+               (for ([ch (in-list (hash-ref subscriptions 'gc null))])
+                 (sync/timeout 0 (channel-put-evt ch `(gc ,ts ,data))))
+               (loop subscriptions))))))))
+    (λ ()
+      (channel-put stop-ch '(stop))
+      (thread-wait thd)
+      (custodian-shutdown-all server-cust))))
 
 (define (handle client-in client-out server-ch)
   (define (disconnect)
