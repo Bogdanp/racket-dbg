@@ -1,9 +1,12 @@
 #lang racket/base
 
-(require profile/render-json
+(require (for-syntax racket/base
+                     syntax/parse)
+         profile/render-json
          racket/match
          racket/tcp
-         "common.rkt")
+         "common.rkt"
+         "error.rkt")
 
 (provide
  current-client
@@ -25,21 +28,44 @@
 
 (struct client (async-ch manager-thd))
 
+(define (oops fmt . args)
+  (exn:fail:dbg:client (apply format fmt args) (current-continuation-marks)))
+
 (struct Cmd (id res-ch nack-evt))
+(struct Req Cmd ())
 (struct Rep Cmd (response))
+
+(define (Cmd->Rep cmd response)
+  (Rep (Cmd-id cmd)
+       (Cmd-res-ch cmd)
+       (Cmd-nack-evt cmd)
+       response))
+
+(define-match-expander cmd
+  (λ (stx)
+    (syntax-parse stx
+      [(_ cmds:expr id:expr)
+       #'(app (λ (the-id)
+                (findf
+                 (λ (c)
+                   (equal? (Cmd-id c) the-id))
+                 cmds))
+              (? values id))])))
 
 (define (connect #:host [host "127.0.0.1"]
                  #:port [port 9011])
   (define-values (in out)
     (tcp-connect host port))
   (define async-ch (make-channel))
+  (define data-evt (handle-evt in read))
   (define manager-thd
     (thread/suspend-to-kill
      (lambda ()
-       (let loop ([seq 0] [cmds null])
+       (let loop ([connected? #t] [seq 0] [cmds null])
          (with-handlers ([exn:fail:network?
                           (λ (e)
-                            (log-error "connection error: ~a" (exn-message e)))])
+                            (log-error "connection error: ~a" (exn-message e))
+                            (loop #f seq cmds))])
            (apply
             sync
             (handle-evt
@@ -47,51 +73,40 @@
              (λ (_)
                (match (thread-receive)
                  [`(,name ,args ... ,res-ch ,nack-evt)
-                  (define cmd (Cmd seq res-ch nack-evt))
+                  #:when connected?
+                  (define req (Req seq res-ch nack-evt))
                   (write/flush `(,name ,seq ,@args) out)
-                  (loop (add1 seq) (cons cmd cmds))])))
+                  (loop connected? (add1 seq) (cons req cmds))]
+
+                 [`(,_ ,_ ... ,res-ch ,nack-evt)
+                  (define err (oops "not connected"))
+                  (define rep (Rep seq res-ch nack-evt err))
+                  (loop connected? (add1 seq) (cons rep cmds))])))
 
             (handle-evt
-             in
-             (lambda (_)
-               (define data (read in))
-               (define-values (id response)
-                 (match data
-                   [(? eof-object?)
-                    (values #f #f)]
+             (if connected? data-evt never-evt)
+             (match-lambda
+               [(? eof-object?)
+                (tcp-abandon-port in)
+                (tcp-abandon-port out)
+                (loop #f seq cmds)]
 
-                   [`(async ,topic ,ts ,data)
-                    (values 'async `(,topic ,ts ,data))]
+               [`(async ,topic ,ts ,data)
+                (sync/timeout 0 (channel-put-evt async-ch `(,topic ,ts ,data)))
+                (loop connected? seq cmds)]
 
-                   [`(error ,id ,message)
-                    (values id (exn:fail message (current-continuation-marks)))]
+               [`(error ,(cmd cmds req) ,message)
+                (define err (oops "~a" message))
+                (define rep (Cmd->Rep req err))
+                (loop connected? seq (cons rep (remq req cmds)))]
 
-                   [`(,cmd ,id ,args ...)
-                    (values id `(,cmd ,@args))]
+               [`(,message ,(cmd cmds req) ,args ...)
+                (define rep (Cmd->Rep req `(,message ,@args)))
+                (loop connected? seq (cons rep (remq req cmds)))]
 
-                   [`(error ,message)
-                    (values #f message)]))
-
-               (cond
-                 [(and id (eq? id 'async))
-                  (sync/timeout 0 (channel-put-evt async-ch response))
-                  (loop seq cmds)]
-
-                 [(and id (findf
-                           (λ (r)
-                             (equal? (Cmd-id r) id))
-                           cmds))
-                  => (λ (req)
-                       (define rep
-                         (Rep (Cmd-id req)
-                              (Cmd-res-ch req)
-                              (Cmd-nack-evt req)
-                              response))
-                       (loop seq (cons rep (remq req cmds))))]
-
-                 [else
-                  (log-warning "orphan response: ~e" data)
-                  (loop seq cmds)])))
+               [`(error ,message)
+                (log-error "orphan error: ~e" message)
+                (loop connected? seq cmds)]))
 
             (append
              (for/list ([cmd (in-list cmds)])
@@ -101,14 +116,14 @@
                      (Cmd-res-ch cmd)
                      (Rep-response cmd))
                     (λ (_)
-                      (loop seq (remq cmd cmds))))
+                      (loop connected? seq (remq cmd cmds))))
                    never-evt))
 
              (for/list ([cmd (in-list cmds)])
                (handle-evt
                 (Cmd-nack-evt cmd)
                 (λ (_)
-                  (loop seq (remq cmd cmds))))))))))))
+                  (loop connected? seq (remq cmd cmds))))))))))))
   (client async-ch manager-thd))
 
 (define (do-send c cmd)
@@ -121,9 +136,9 @@
         (thread-resume thd)
         (thread-send thd `(,@cmd ,res-ch ,nack-evt)))))
    (λ (v-or-exn)
-     (begin0 v-or-exn
-       (when (exn:fail? v-or-exn)
-         (raise v-or-exn))))))
+     (if (exn:fail:dbg:client? v-or-exn)
+         (raise v-or-exn)
+         v-or-exn))))
 
 (define-syntax-rule (send c cmd arg ...)
   (do-send c (list 'cmd arg ...)))
