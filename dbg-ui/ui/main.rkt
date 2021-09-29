@@ -95,7 +95,10 @@
   (class %
     (super-new)
     (define/augment (on-close)
-      (disconnect c))))
+      (with-handlers ([(λ (_) #t)
+                       (λ (e)
+                         ((error-display-handler) (exn-message e) e))])
+        (disconnect c)))))
 
 (define (labeled label v)
   (hpanel
