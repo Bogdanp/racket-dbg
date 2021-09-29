@@ -33,13 +33,13 @@
 
 (struct Cmd (id res-ch nack-evt))
 (struct Req Cmd ())
-(struct Rep Cmd (response))
+(struct Rep Cmd (data))
 
-(define (Cmd->Rep cmd response)
+(define (Cmd->Rep cmd data)
   (Rep (Cmd-id cmd)
        (Cmd-res-ch cmd)
        (Cmd-nack-evt cmd)
-       response))
+       data))
 
 (define-match-expander cmd
   (λ (stx)
@@ -116,7 +116,7 @@
                    (handle-evt
                     (channel-put-evt
                      (Cmd-res-ch cmd)
-                     (Rep-response cmd))
+                     (Rep-data cmd))
                     (λ (_)
                       (loop connected? seq (remq cmd cmds))))
                    never-evt))
