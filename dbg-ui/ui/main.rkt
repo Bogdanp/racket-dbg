@@ -1,11 +1,14 @@
 #lang racket/base
 
 (require debugging/client
+         json
          plot
          (prefix-in prof: profile/analyzer)
+         (prefix-in prof: profile/render-json)
          (prefix-in prof: profile/render-text)
          racket/class
          racket/format
+         (prefix-in gui: racket/gui)
          racket/gui/easy
          racket/gui/easy/operator
          racket/list
@@ -210,10 +213,21 @@
 (struct recording (name prof)
   #:transparent)
 
+(define (recording->jsexpr r)
+  (hasheq
+   'name (recording-name r)
+   'prof (prof:profile->json (recording-prof r))))
+
+(define (jsexpr->recording e)
+  (recording
+   (hash-ref e 'name)
+   (prof:json->profile (hash-ref e 'prof))))
+
 (define (performance-tab c)
   (define/obs @recordings null)
   (define/obs @recording? #f)
   (define/obs @errortrace? #f)
+  (define/obs @selection #f)
   (define (toggle-recording)
     (@recording? . <~ . (λ (on?)
                           (begin0 (not on?)
@@ -229,23 +243,53 @@
    (vpanel
     (hpanel
      #:stretch '(#t #f)
-     (button
-      (@recording? . ~> . (λ (on?)
-                            (if on?
-                                "Stop recording..."
-                                "Start recording...")))
-      (λ () (defer (toggle-recording))))
-     (checkbox
-      #:label "Errortrace?"
-      (λ:= @errortrace?)))
+     (hpanel
+      (button
+       (@recording? . ~> . (λ (on?)
+                             (if on?
+                                 "Stop recording..."
+                                 "Start recording...")))
+       (λ () (defer (toggle-recording))))
+      (checkbox
+       #:label "Errortrace?"
+       (λ:= @errortrace?)))
+     (hpanel
+      #:alignment '(right center)
+      (button
+       "&Import..."
+       (λ ()
+         (define filename
+           (gui:get-file #f #f #f #f #f null '(("JSON" "*.json") ("Any" "*.*"))))
+         (when filename
+           (define rec
+             (call-with-input-file filename
+               (lambda (in)
+                 (jsexpr->recording (read-json in)))))
+           (@recordings . <~ . (λ (recordings)
+                                 (cons rec recordings))))))
+      (button
+       "&Export..."
+       #:enabled? (@selection . ~> . (compose1 not not))
+       (λ ()
+         (define rec (obs-peek @selection))
+         (define filename
+           (gui:put-file #f #f #f "recording.json" #f null '(("JSON" "*.json") ("Any" "*.*"))))
+         (when filename
+           (call-with-output-file filename
+             #:exists 'replace
+             (lambda (out)
+               (write-json (recording->jsexpr rec) out))))))))
     (table
      '("Recording")
      (@recordings . ~> . list->vector)
      #:entry->row (λ (r) (vector (recording-name r)))
      (λ (event entries selection)
+       (define rec (vector-ref entries selection))
        (case event
+         [(select)
+          (@selection . := . rec)]
+
          [(dclick)
-          (define rec (vector-ref entries selection))
           (define prof (recording-prof rec))
           (define nodes (sort (prof:profile-nodes prof) #:key prof:node-total >))
           (define/obs @tab 'tree-map)
