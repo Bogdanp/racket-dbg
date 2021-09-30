@@ -284,12 +284,12 @@
      (@recordings . ~> . list->vector)
      #:entry->row (λ (r) (vector (recording-name r)))
      (λ (event entries selection)
-       (define rec (vector-ref entries selection))
        (case event
          [(select)
-          (@selection . := . rec)]
+          (@selection . := . (and selection (vector-ref entries selection)))]
 
          [(dclick)
+          (define rec (vector-ref entries selection))
           (define prof (recording-prof rec))
           (define nodes (sort (prof:profile-nodes prof) #:key prof:node-total >))
           (define/obs @tab 'tree-map)
