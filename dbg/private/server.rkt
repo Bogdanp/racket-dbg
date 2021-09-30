@@ -14,6 +14,9 @@
 (define current-root-custodian
   (make-parameter #f))
 
+(define current-prof-custodian
+  (make-parameter #f))
+
 (define system-info
   (hash-set*
    (for/hasheq ([k (in-list '(os* arch vm))])
@@ -24,6 +27,7 @@
                #:port [port 9011])
   (define cust (make-custodian))
   (current-root-custodian (current-custodian))
+  (current-prof-custodian cust)
   (current-custodian cust)
   (define cmd-ch (make-channel))
   (define stop-ch (make-channel))
@@ -138,7 +142,7 @@
                [else
                 (define sampler
                   (create-sampler
-                   (current-custodian)
+                   (current-prof-custodian)
                    (/ delay-ms 1000.0)
                    (current-root-custodian)
                    #:use-errortrace? errortrace?))
