@@ -184,7 +184,7 @@
         (and last-click
              (- (send e get-time-stamp)
                 (send last-click get-time-stamp))))
-      (and delta (< delta 200)))
+      (and delta (< delta 300)))
     (define/override (on-event e)
       (set! mouse-x (send e get-x))
       (set! mouse-y (send e get-y))
