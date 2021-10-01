@@ -5,7 +5,8 @@
 
 (module+ main
   (require debugging/client
-           racket/cmdline)
+           racket/cmdline
+           racket/gui)
 
   (define-values (host port)
     (let ([host "127.0.0.1"]
@@ -22,8 +23,21 @@
        #:args []
        (values host port))))
 
-  (void
-   (start-ui
+  (define conn
     (connect
      #:host host
-     #:port port))))
+     #:port port))
+
+  (let/cc esc
+    (uncaught-exception-handler
+     (λ (e)
+       (define message
+         (call-with-output-string
+           (λ (out)
+             (parameterize ([current-error-port out])
+               ((error-display-handler) (exn-message e) e)))))
+       (message-box "Error" message #f '(stop ok))
+       (esc)))
+
+    (displayln "here")
+    (void (start-ui conn))))

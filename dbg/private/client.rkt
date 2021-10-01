@@ -81,7 +81,7 @@
                   (loop connected? (add1 seq) (cons req cmds))]
 
                  [`(,_ ,_ ... ,res-ch ,nack-evt)
-                  (define err (oops "not connected"))
+                  (define err (oops "client: not connected"))
                   (define rep (Rep seq res-ch nack-evt err))
                   (loop connected? (add1 seq) (cons rep cmds))])))
 
