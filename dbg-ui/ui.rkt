@@ -39,5 +39,4 @@
        (message-box "Error" message #f '(stop ok))
        (esc)))
 
-    (displayln "here")
     (void (start-ui conn))))
