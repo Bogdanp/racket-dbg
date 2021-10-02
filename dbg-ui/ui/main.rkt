@@ -359,7 +359,7 @@
      (get-memory-use c)))
   (define/obs @state/throttled
     (obs-throttle
-     #:duration 250
+     #:duration 1000
      @state))
   (start-async-handler @state (async-evt c))
   (subscribe c 'gc)
