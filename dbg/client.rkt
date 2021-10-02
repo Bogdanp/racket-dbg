@@ -10,6 +10,7 @@
  (contract-out
   [current-client (parameter/c client?)]
   [client? (-> any/c boolean?)]
+  [connected? (-> client? boolean?)]
   [connect (->* ()
                 (#:host string?
                  #:port (integer-in 0 65535))

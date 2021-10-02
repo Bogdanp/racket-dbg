@@ -102,9 +102,9 @@
     (super-new)
     (define/augment (on-close)
       (with-handlers ([(λ (_) #t)
-                       (λ (e)
-                         ((error-display-handler) (exn-message e) e))])
-        (disconnect c)))))
+                       (λ (e) ((error-display-handler) (exn-message e) e))])
+        (when (connected? c)
+          (disconnect c))))))
 
 (define (labeled label v)
   (hpanel

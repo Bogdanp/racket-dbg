@@ -11,6 +11,7 @@
 (provide
  current-client
  client?
+ connected?
  connect
  disconnect
  subscribe
@@ -127,6 +128,9 @@
                 (λ (_)
                   (loop connected? seq (remq cmd cmds))))))))))))
   (client async-ch manager-thd))
+
+(define (connected? c)
+  (thread-running? (client-manager-thd c)))
 
 (define (do-send c cmd)
   (define thd (client-manager-thd c))
