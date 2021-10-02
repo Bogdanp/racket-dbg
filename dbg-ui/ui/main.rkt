@@ -72,13 +72,13 @@
                `(,(gc-tick ts mode amt duration)))
               hist)]))
 
-(define (start-async-handler @state evt)
+(define (start-async-handler @state c)
   (thread
    (lambda ()
      (let loop ()
        (sync
         (handle-evt
-         evt
+         (async-evt c)
          (λ (topic&data)
            (match topic&data
              [`(gc ,ts ,info)
@@ -104,7 +104,7 @@
       (with-handlers ([(λ (_) #t)
                        (λ (e) ((error-display-handler) (exn-message e) e))])
         (when (connected? c)
-          (disconnect c))))))
+          (disconnect! c))))))
 
 (define (labeled label v)
   (hpanel
@@ -115,8 +115,7 @@
     (text label))
    v))
 
-(define (info-tab c)
-  (define info (get-info c))
+(define (info-tab info)
   (vpanel
    #:margin '(5 5)
    #:alignment '(left top)
@@ -364,13 +363,21 @@
     (obs-throttle
      #:duration 1000
      @state))
-  (start-async-handler @state (async-evt c))
+  (start-async-handler @state c)
   (subscribe c 'gc)
   (render
    (window
     #:title "Remote Debugger"
     #:size '(600 400)
     #:mixin (make-window-mixin c)
+    (menu-bar
+     (menu
+      "&File"
+      (menu-item "&Reconnect..." (λ ()
+                                   (reconnect! c)
+                                   (subscribe c 'gc)))
+      (menu-item-separator)
+      (menu-item "&Quit" (λ () ((gui:application-quit-handler))))))
     (let ([the-tabs '(info charts memory performance)])
       (tabs
        (map (compose1 string-titlecase symbol->string) the-tabs)
@@ -381,7 +388,7 @@
        (case-view
         @tab
         [(info)
-         (info-tab c)]
+         (info-tab (get-info c))]
 
         [(charts)
          (charts-tab
