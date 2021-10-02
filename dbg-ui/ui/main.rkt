@@ -39,7 +39,7 @@
   #:transparent)
 
 (define (make-state)
-  (state 100 0 0 null 0 0 null))
+  (state 1000 0 0 null 0 0 null))
 
 (define (set-memory-use s amt)
   (struct-copy state s
