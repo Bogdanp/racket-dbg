@@ -10,12 +10,13 @@
  (contract-out
   [current-client (parameter/c client?)]
   [client? (-> any/c boolean?)]
-  [connected? (-> client? boolean?)]
   [connect (->* ()
                 (#:host string?
                  #:port (integer-in 0 65535))
                 client?)]
-  [disconnect (client-> void?)]
+  [connected? (client-> boolean?)]
+  [reconnect! (client-> void?)]
+  [disconnect! (client-> void?)]
   [subscribe (case-client-> symbol? void?)]
   [unsubscribe (case-client-> symbol? void?)]
   [async-evt (client-> evt?)]

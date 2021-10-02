@@ -11,9 +11,10 @@
 (provide
  current-client
  client?
- connected?
  connect
- disconnect
+ connected?
+ reconnect!
+ disconnect!
  subscribe
  unsubscribe
  async-evt
@@ -27,7 +28,12 @@
 (define current-client
   (make-parameter #f))
 
-(struct client (async-ch manager-thd))
+(struct client
+  (host
+   port
+   async-ch
+   [io #:mutable]
+   [manager-thd #:mutable]))
 
 (define (oops fmt . args)
   (exn:fail:dbg:client (apply format fmt args) (current-continuation-marks)))
@@ -58,79 +64,94 @@
   (define-values (in out)
     (tcp-connect host port))
   (define async-ch (make-channel))
-  (define data-evt (handle-evt in read))
   (define manager-thd
-    (thread/suspend-to-kill
-     (lambda ()
-       (let loop ([connected? #t] [seq 0] [cmds null])
-         (with-handlers ([exn:fail:network?
-                          (λ (e)
-                            (log-error "connection error: ~a" (exn-message e))
-                            (tcp-abandon-port in)
-                            (tcp-abandon-port out)
-                            (loop #f seq cmds))])
-           (apply
-            sync
-            (handle-evt
-             (thread-receive-evt)
-             (λ (_)
-               (match (thread-receive)
-                 [`(,name ,args ... ,res-ch ,nack-evt)
-                  #:when connected?
-                  (define req (Req seq res-ch nack-evt))
-                  (write/flush `(,name ,seq ,@args) out)
-                  (loop connected? (add1 seq) (cons req cmds))]
+    (start-manager-thread async-ch in out))
+  (client host port async-ch (list in out) manager-thd))
 
-                 [`(,_ ,_ ... ,res-ch ,nack-evt)
-                  (define err (oops "client: not connected"))
-                  (define rep (Rep seq res-ch nack-evt err))
-                  (loop connected? (add1 seq) (cons rep cmds))])))
+(define (start-manager-thread async-ch in out)
+  (thread/suspend-to-kill
+   (lambda ()
+     (define data-evt (handle-evt in read))
+     (let loop ([connected? #t] [seq 0] [cmds null])
+       (with-handlers ([exn:break:terminate? void]
+                       [exn:fail:network?
+                        (λ (e)
+                          (log-error "connection error: ~a" (exn-message e))
+                          (tcp-abandon-port in)
+                          (tcp-abandon-port out)
+                          (loop #f seq cmds))])
+         (apply
+          sync
+          (handle-evt
+           (thread-receive-evt)
+           (λ (_)
+             (match (thread-receive)
+               [`(,name ,args ... ,res-ch ,nack-evt)
+                #:when connected?
+                (define req (Req seq res-ch nack-evt))
+                (write/flush `(,name ,seq ,@args) out)
+                (loop connected? (add1 seq) (cons req cmds))]
 
-            (handle-evt
-             (if connected? data-evt never-evt)
-             (match-lambda
-               [(? eof-object?)
-                (tcp-abandon-port in)
-                (tcp-abandon-port out)
-                (loop #f seq cmds)]
+               [`(,_ ,_ ... ,res-ch ,nack-evt)
+                (define err (oops "client: not connected"))
+                (define rep (Rep seq res-ch nack-evt err))
+                (loop connected? (add1 seq) (cons rep cmds))])))
 
-               [`(async ,topic ,ts ,data)
-                (sync/timeout 0 (channel-put-evt async-ch `(,topic ,ts ,data)))
-                (loop connected? seq cmds)]
+          (handle-evt
+           (if connected? data-evt never-evt)
+           (match-lambda
+             [(? eof-object?)
+              (tcp-abandon-port in)
+              (tcp-abandon-port out)
+              (loop #f seq cmds)]
 
-               [`(error ,(cmd cmds req) ,message)
-                (define err (oops "~a" message))
-                (define rep (Cmd->Rep req err))
-                (loop connected? seq (cons rep (remq req cmds)))]
+             [`(async ,topic ,ts ,data)
+              (sync/timeout 0 (channel-put-evt async-ch `(,topic ,ts ,data)))
+              (loop connected? seq cmds)]
 
-               [`(,message ,(cmd cmds req) ,args ...)
-                (define rep (Cmd->Rep req `(,message ,@args)))
-                (loop connected? seq (cons rep (remq req cmds)))]
+             [`(error ,(cmd cmds req) ,message)
+              (define err (oops "~a" message))
+              (define rep (Cmd->Rep req err))
+              (loop connected? seq (cons rep (remq req cmds)))]
 
-               [`(error ,message)
-                (log-error "orphan error: ~e" message)
-                (loop connected? seq cmds)]))
+             [`(,message ,(cmd cmds req) ,args ...)
+              (define rep (Cmd->Rep req `(,message ,@args)))
+              (loop connected? seq (cons rep (remq req cmds)))]
 
-            (append
-             (for/list ([cmd (in-list cmds)])
-               (if (Rep? cmd)
-                   (handle-evt
-                    (channel-put-evt
-                     (Cmd-res-ch cmd)
-                     (Rep-data cmd))
-                    (λ (_)
-                      (loop connected? seq (remq cmd cmds))))
-                   never-evt))
+             [`(error ,message)
+              (log-error "orphan error: ~e" message)
+              (loop connected? seq cmds)]))
 
-             (for/list ([cmd (in-list cmds)])
-               (handle-evt
-                (Cmd-nack-evt cmd)
-                (λ (_)
-                  (loop connected? seq (remq cmd cmds))))))))))))
-  (client async-ch manager-thd))
+          (append
+           (for/list ([cmd (in-list cmds)])
+             (if (Rep? cmd)
+                 (handle-evt
+                  (channel-put-evt
+                   (Cmd-res-ch cmd)
+                   (Rep-data cmd))
+                  (λ (_)
+                    (loop connected? seq (remq cmd cmds))))
+                 never-evt))
 
-(define (connected? c)
-  (thread-running? (client-manager-thd c)))
+           (for/list ([cmd (in-list cmds)])
+             (handle-evt
+              (Cmd-nack-evt cmd)
+              (λ (_)
+                (loop connected? seq (remq cmd cmds))))))))))))
+
+(define (connected? [c (current-client)])
+  (andmap (compose1 not port-closed?) (client-io c)))
+
+(define (reconnect! [c (current-client)])
+  (when (connected? c)
+    (disconnect! c))
+  (match-define (client host port async-ch _io _manager-thd) c)
+  (define-values (in out)
+    (tcp-connect host port))
+  (define manager-thd
+    (start-manager-thread async-ch in out))
+  (set-client-io! c (list in out))
+  (set-client-manager-thd! c manager-thd))
 
 (define (do-send c cmd)
   (define thd (client-manager-thd c))
@@ -155,8 +176,9 @@
 (define (async-evt [c (current-client)])
   (client-async-ch c))
 
-(define (disconnect [c (current-client)])
-  (void (send/sync c disconnect)))
+(define (disconnect! [c (current-client)])
+  (void (send/sync c disconnect))
+  (break-thread (client-manager-thd c) 'terminate))
 
 (define subscribe
   (case-lambda
