@@ -91,6 +91,9 @@
 
 ;; components ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define mono-font
+  (font* "Dank Mono, Operator Mono, PT Mono, SF Mono, Inconsolata, Consolas, Courier New, Courier" 14))
+
 (define-syntax-rule (defer e0 e ...)
   (thread (λ () e0 e ...)))
 
@@ -341,7 +344,7 @@
                 [(text)
                  (hpanel
                   (input
-                   #:font (font "SF Mono" 12 #:weight 'light)
+                   #:font mono-font
                    #:style '(multiple)
                    #:stretch '(#t #t)
                    (with-output-to-string
