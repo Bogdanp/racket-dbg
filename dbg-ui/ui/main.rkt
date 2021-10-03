@@ -116,7 +116,8 @@
    v))
 
 (define (info-tab info)
-  (vpanel
+  (group
+   "General"
    #:margin '(5 5)
    #:alignment '(left top)
    (labeled "Operating system:" (text (~a (hash-ref info 'os*))))
