@@ -307,51 +307,50 @@
                  (case e
                    [(select)
                     (@tab . := . (list-ref the-tabs index))]))
-               (case-view
-                @tab
-                [(tree-map)
-                 (vpanel
+               (case-view @tab
+                 [(tree-map)
+                  (vpanel
+                   (hpanel
+                    #:stretch '(#t #f)
+                    #:alignment '(center center)
+                    (choice
+                     nodes
+                     #:choice->label (λ (n)
+                                       (format "~a (~a)"
+                                               (~profile-node n)
+                                               (prof:node-total n)))
+                     #:selection (@tree . ~> . node-data)
+                     (λ (n)
+                       (@tree . := . (profile-node->tree-map-tree n)))))
+                   (let ([st null])
+                     (tree-map
+                      @tree
+                      #:scale 1
+                      #:action (λ (e n)
+                                 (case e
+                                   [(dclick)
+                                    (when n
+                                      (@tree . <~ . (λ (tree)
+                                                      (set! st (cons tree st))
+                                                      (profile-node->tree-map-tree n))))]
+                                   [(rclick)
+                                    (unless (null? st)
+                                      (@tree . := . (car st))
+                                      (set! st (cdr st)))]))
+                      #:data->label ~profile-node)))]
+
+                 [(text)
                   (hpanel
-                   #:stretch '(#t #f)
-                   #:alignment '(center center)
-                   (choice
-                    nodes
-                    #:choice->label (λ (n)
-                                      (format "~a (~a)"
-                                              (~profile-node n)
-                                              (prof:node-total n)))
-                    #:selection (@tree . ~> . node-data)
-                    (λ (n)
-                      (@tree . := . (profile-node->tree-map-tree n)))))
-                  (let ([st null])
-                    (tree-map
-                     @tree
-                     #:scale 1
-                     #:action (λ (e n)
-                                (case e
-                                  [(dclick)
-                                   (when n
-                                     (@tree . <~ . (λ (tree)
-                                                     (set! st (cons tree st))
-                                                     (profile-node->tree-map-tree n))))]
-                                  [(rclick)
-                                   (unless (null? st)
-                                     (@tree . := . (car st))
-                                     (set! st (cdr st)))]))
-                     #:data->label ~profile-node)))]
+                   (input
+                    #:font mono-font
+                    #:style '(multiple)
+                    #:stretch '(#t #t)
+                    (with-output-to-string
+                      (lambda ()
+                        (prof:render prof)))))]
 
-                [(text)
-                 (hpanel
-                  (input
-                   #:font mono-font
-                   #:style '(multiple)
-                   #:stretch '(#t #t)
-                   (with-output-to-string
-                     (lambda ()
-                       (prof:render prof)))))]
-
-                [else
-                 (hpanel)])))))]))))))
+                 [else
+                  (hpanel)])))))]))))))
 
 (define (start-ui c)
   (define/obs @tab 'info)
@@ -361,7 +360,7 @@
      (get-memory-use c)))
   (define/obs @state/throttled
     (obs-throttle
-     #:duration 1000
+     #:duration 250
      @state))
   (start-async-handler @state c)
   (subscribe c 'gc)
@@ -373,11 +372,16 @@
     (menu-bar
      (menu
       "&File"
-      (menu-item "&Reconnect..." (λ ()
-                                   (reconnect! c)
-                                   (subscribe c 'gc)))
+      (menu-item
+       "&Reconnect..."
+       (λ ()
+         (reconnect! c)
+         (subscribe c 'gc)))
       (menu-item-separator)
-      (menu-item "&Quit" (λ () ((gui:application-quit-handler))))))
+      (menu-item
+       "&Quit"
+       (λ ()
+         ((gui:application-quit-handler))))))
     (let ([the-tabs '(info charts memory performance)])
       (tabs
        (map (compose1 string-titlecase symbol->string) the-tabs)
@@ -385,27 +389,26 @@
          (case event
            [(select)
             (@tab . := . (list-ref the-tabs index))]))
-       (case-view
-        @tab
-        [(info)
-         (info-tab (get-info c))]
+       (case-view @tab
+         [(info)
+          (info-tab (get-info c))]
 
-        [(charts)
-         (charts-tab
-          @state/throttled
-          (match-lambda
-            [`(commit-history ,hist)
-             (@state . <~ . (λ (s)
-                              (struct-copy state s [history hist])))]))]
+         [(charts)
+          (charts-tab
+           @state/throttled
+           (match-lambda
+             [`(commit-history ,hist)
+              (@state . <~ . (λ (s)
+                               (struct-copy state s [history hist])))]))]
 
-        [(memory)
-         (memory-tab c)]
+         [(memory)
+          (memory-tab c)]
 
-        [(performance)
-         (performance-tab c)]
+         [(performance)
+          (performance-tab c)]
 
-        [else
-         (hpanel)]))))))
+         [else
+          (hpanel)]))))))
 
 (define (plot-memory-usage s w h)
   (parameterize ([plot-title "Memory Use"]
@@ -478,14 +481,25 @@
 (define (plot-canvas @data make-plot-snip)
   (canvas
    @data
-   (λ (dc data)
-     (define-values (w h)
-       (send dc get-size))
-     (define snip
-       (make-plot-snip data w h))
-     (define bmp
-       (send snip get-bitmap))
-     (send dc draw-bitmap bmp 0 0))))
+   (let ([last-data #f]
+         [last-bmp  #f])
+     (λ (dc data)
+       (define-values (w h)
+         (send dc get-size))
+       (define draw-data
+         (list w h data))
+       (define bmp
+         (cond
+           [(equal? draw-data last-data) last-bmp]
+           [else
+            (define snip
+              (make-plot-snip data w h))
+            (define bmp
+              (send snip get-bitmap))
+            (begin0 bmp
+              (set! last-data draw-data)
+              (set! last-bmp  bmp))]))
+       (send dc draw-bitmap bmp 0 0)))))
 
 (define area
   (make-keyword-procedure
