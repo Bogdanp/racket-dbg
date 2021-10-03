@@ -155,8 +155,8 @@
       (hpanel
        #:margin '(5 5)
        #:spacing 5
-       (plot-canvas @state plot-memory-usage)
-       (plot-canvas @state plot-gc-pauses))]
+       (snip-canvas @state plot-memory-usage)
+       (snip-canvas @state plot-gc-pauses))]
 
      [else
       (text "No GC data.")]))))
@@ -477,29 +477,6 @@
      (list
       (points #:label "Major GC" #:color 4 major-gcs)
       (points #:label "Minor GC" #:color 1 minor-gcs)))))
-
-(define (plot-canvas @data make-plot-snip)
-  (canvas
-   @data
-   (let ([last-data #f]
-         [last-bmp  #f])
-     (λ (dc data)
-       (define-values (w h)
-         (send dc get-size))
-       (define draw-data
-         (list w h data))
-       (define bmp
-         (cond
-           [(equal? draw-data last-data) last-bmp]
-           [else
-            (define snip
-              (make-plot-snip data w h))
-            (define bmp
-              (send snip get-bitmap))
-            (begin0 bmp
-              (set! last-data draw-data)
-              (set! last-bmp  bmp))]))
-       (send dc draw-bitmap bmp 0 0)))))
 
 (define area
   (make-keyword-procedure
