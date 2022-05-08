@@ -4,6 +4,7 @@
          profile/render-json
          profile/sampler
          racket/match
+         racket/port
          racket/tcp
          "common.rkt"
          "memory.rkt")
@@ -131,6 +132,10 @@
 
             [`(get-object-counts ,id)
              (write/flush `(object-counts ,id ,(get-object-counts)))
+             (loop s)]
+
+            [`(get-struct-reference-graph ,id ,name)
+             (write/flush `(object-graph ,id ,(get-object-graph/by-struct (string->symbol name))))
              (loop s)]
 
             [`(start-profile ,id ,delay-ms ,errortrace?)

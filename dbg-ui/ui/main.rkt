@@ -14,6 +14,7 @@
          racket/list
          racket/match
          racket/port
+         "dot.rkt"
          "profile.rkt"
          "tree-map.rkt")
 
@@ -209,7 +210,17 @@
                      (vector
                       (car entry)
                       (~a (cadr entry))
-                      (~size (cddr entry)))))]
+                      (~size (cddr entry))))
+      (lambda (event entries selection)
+        (when selection
+          (case event
+            [(dclick)
+             (define entry (vector-ref entries selection))
+             (match (car entry)
+               [(regexp #rx"<struct-type:([^>]+)>" (list _ name))
+                (write-graph-pdf
+                 (gui:put-file "Save Graph" #f #f (format "~a-graph.pdf" name) #f null '(("PDF" "*.pdf")))
+                 (get-struct-reference-graph name c))])]))))]
     [else
      (text "Loading...")])))
 
