@@ -2,7 +2,6 @@
 
 (require ffi/unsafe/atomic
          ffi/unsafe/vm
-         racket/list
          racket/port)
 
 (provide
@@ -75,15 +74,16 @@
   (define links (make-hasheqv))
   (define (track! ob)
     (define ob-id (id ob))
-    (hash-set! metadata ob-id (object-metadata ob ob-id))
-    (for ([ref (in-list (hash-ref graph ob null))])
-      (define ref-id (id ref))
-      (hash-set! metadata ref-id (object-metadata ref ref-id))
-      (hash-update! links ob-id
-                    (λ (ob-ids)
-                      (remove-duplicates (cons ref-id ob-ids)))
-                    null)
-      (track! ref)))
+    (unless (hash-has-key? metadata ob-id)
+      (hash-set! metadata ob-id (object-metadata ob ob-id))
+      (for ([ref (in-list (hash-ref graph ob null))])
+        (define ref-id (id ref))
+        (hash-update! links ob-id
+                      (λ (ob-ids)
+                        (cons ref-id ob-ids))
+                      null))
+      (for ([ref (in-list (hash-ref graph ob null))])
+        (track! ref))))
   (define objects
     (for/list ([ob (in-hash-keys graph)] #:when (proc ob))
       (track! ob)
