@@ -16,6 +16,7 @@
          racket/port
          "dot.rkt"
          "profile.rkt"
+         "reference-graph.rkt"
          "tree-map.rkt")
 
 (provide
@@ -218,9 +219,37 @@
              (define entry (vector-ref entries selection))
              (match (car entry)
                [(regexp #rx"<struct-type:([^>]+)>" (list _ name))
-                (write-graph-pdf
-                 (gui:put-file "Save Graph" #f #f (format "~a-graph.pdf" name) #f null '(("PDF" "*.pdf")))
-                 (get-struct-reference-graph name c))])]))))]
+                (define graph
+                  (get-struct-reference-graph name c))
+                (define root
+                  (render
+                   (window
+                    #:title (format "~a Backreferences" name)
+                    #:size '(800 600)
+                    (reference-graph
+                     graph
+                     (lambda (item event)
+                       (render-popup-menu
+                        root
+                        (popup-menu
+                         (menu-item
+                          "Save Graph..."
+                          (λ ()
+                            (write-graph-pdf
+                             (gui:put-file "Save Graph..." #f #f #f #f null '(("PDF" "*.pdf")))
+                             graph
+                             (hash-ref item 'id))))
+                         (menu-item
+                          "Copy..."
+                          (λ ()
+                            (send
+                             gui:the-clipboard
+                             set-clipboard-string
+                             (hash-ref item 'str)
+                             (send event get-time-stamp)))))
+                        (send event get-x)
+                        (send event get-y)))))))
+                (void)])]))))]
     [else
      (text "Loading...")])))
 

@@ -3,11 +3,13 @@
 (define version "0.1")
 (define collection "debugging")
 (define deps '("base"
+               "canvas-list"
                "dbg"
                "gui-easy-lib"
                "gui-lib"
-               "plot-lib"
+               "pict-lib"
                "plot-gui-lib"
+               "plot-lib"
                "profile-lib"))
 (define build-deps '("rackunit-lib"))
 (define raco-commands
