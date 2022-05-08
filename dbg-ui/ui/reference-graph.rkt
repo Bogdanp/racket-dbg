@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require (prefix-in p: pict)
+         racket/format
          racket/gui/easy
          "common.rkt"
          "resource.rkt"
@@ -41,7 +42,12 @@
           (p:bitmap chevron-forward-icon))
       fg-color)
      (p:colorize
-      (p:text (~shortstr (hash-ref item 'str)) mono-font)
+      (p:text
+       (~a
+        (~shortstr (hash-ref item 'str))
+        " @ "
+        (~addr (hash-ref item 'id)))
+       mono-font)
       fg-color)))
   (p:lt-superimpose
    (p:colorize (p:filled-rectangle w h) bg-color)

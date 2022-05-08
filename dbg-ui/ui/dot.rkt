@@ -21,11 +21,8 @@
        (or
         (hash-ref meta 'name)
         (hash-ref meta 'str)))
-      " @ 0x" (~r
-               #:base 16
-               #:min-width 8
-               #:pad-string "0"
-               id))
+      " @ "
+      (~addr id))
      "\""
      "\\\""))
   (define graph-str
