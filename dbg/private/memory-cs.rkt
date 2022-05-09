@@ -105,25 +105,10 @@
      (write ob out))))
 
 (define (object-metadata ob ob-id)
+  (define maybe-name
+    (object-name ob))
   (hasheq
    'id ob-id
    'str (->string ob)
-   'name (cond
-           [(object-name ob) => ->string]
-           [else #f])
-   'type (object-type ob)))
-
-(define (object-type ob)
-  (cond
-    [(boolean? ob) 'boolean]
-    [(box? ob) 'box]
-    [(bytes? ob) 'bytes]
-    [(hash? ob) 'hash]
-    [(list? ob) 'list]
-    [(pair? ob) 'pair]
-    [(port? ob) 'port]
-    [(procedure? ob) 'procedure]
-    [(record? ob) (record-type-name (record-rtd ob))]
-    [(string? ob) 'string]
-    [(vector? ob) 'vector]
-    [else #f]))
+   'name (and maybe-name
+              (->string maybe-name))))
