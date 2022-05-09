@@ -99,16 +99,25 @@
                            (let ([rtd (record-rtd ob)])
                              (eq? name (record-type-name rtd)))))))
 
-(define (->string ob)
-  (call-with-output-string
-   (lambda (out)
-     (write ob out))))
+(define (->string ob [max-length #f])
+  (define str
+    (call-with-output-string
+     (lambda (out)
+       (write ob out))))
+  (cond
+    [(and max-length (> (string-length str) max-length))
+     (string-set! str (sub1 max-length) #\…)
+     (substring str 0 max-length)]
+    [else
+     str]))
 
 (define (object-metadata ob ob-id)
   (define maybe-name
-    (object-name ob))
+    ;; Some things (eg. `flat-ellipsis-rest-arg') actively raise an
+    ;; error when you try to get their name.
+    (with-handlers ([exn:fail? (λ (_e) #f)])
+      (object-name ob)))
   (hasheq
    'id ob-id
-   'str (->string ob)
-   'name (and maybe-name
-              (->string maybe-name))))
+   'str (->string ob 255)
+   'name (and maybe-name (->string maybe-name 255))))
