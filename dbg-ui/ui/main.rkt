@@ -14,6 +14,7 @@
          racket/list
          racket/match
          racket/port
+         "common.rkt"
          "dot.rkt"
          "profile.rkt"
          "reference-graph.rkt"
@@ -92,9 +93,6 @@
               (loop)]))))))))
 
 ;; components ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define mono-font
-  (font* "Dank Mono, Operator Mono, PT Mono, SF Mono, Inconsolata, Consolas, Courier New, Courier" 14))
 
 (define-syntax-rule (defer e0 e ...)
   (thread (λ () e0 e ...)))

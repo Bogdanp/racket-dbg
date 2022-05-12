@@ -10,12 +10,6 @@
 (provide
  reference-graph)
 
-(define mono-font
-  (font "SF Mono" 12
-        #:family 'modern
-        #:style 'normal
-        #:weight '300))
-
 (define selected-color (color "blue"))
 (define black (color "black"))
 (define white (color "white"))

@@ -1,6 +1,7 @@
 #lang racket/base
 
-(require racket/format)
+(require racket/format
+         racket/gui/easy)
 
 (provide
  ~addr
@@ -17,3 +18,12 @@
   (if (> (string-length s) 70)
       (~a (substring s 0 69) "…")
       s))
+
+(provide
+ mono-font)
+
+(define mono-font
+  (let ([size 14])
+    (or
+     (font* "Dank Mono, Operator Mono, PT Mono, SF Mono, Inconsolata, Consolas, Courier New, Courier" size)
+     (font "Courier" size #:family 'modern))))
