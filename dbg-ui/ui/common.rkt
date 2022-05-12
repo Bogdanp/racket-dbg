@@ -20,10 +20,13 @@
       s))
 
 (provide
- mono-font)
+ mono-font
+ mono-font/12)
 
-(define mono-font
-  (let ([size 14])
-    (or
-     (font* "Dank Mono, Operator Mono, PT Mono, SF Mono, Inconsolata, Consolas, Courier New, Courier" size)
-     (font "Courier" size #:family 'modern))))
+(define (get-mono-font size)
+  (or
+   (font* "Dank Mono, Operator Mono, PT Mono, SF Mono, Inconsolata, Consolas, Courier New, Courier" size)
+   (font "Courier" size #:family 'modern)))
+
+(define mono-font (get-mono-font 14))
+(define mono-font/12 (get-mono-font 12))

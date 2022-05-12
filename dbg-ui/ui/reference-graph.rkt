@@ -14,6 +14,7 @@
 (define black (color "black"))
 (define white (color "white"))
 
+;; 24x24
 (define chevron-down-icon (icon 'chevron-down))
 (define chevron-forward-icon (icon 'chevron-forward))
 
@@ -41,7 +42,7 @@
         (~shortstr (hash-ref item 'str))
         " @ "
         (~addr (hash-ref item 'id)))
-       mono-font)
+       mono-font/12)
       fg-color)))
   (p:lt-superimpose
    (p:colorize (p:filled-rectangle w h) bg-color)
@@ -60,7 +61,7 @@
                      (loop ref))))))
   (tree-list
    tree
-   #:item-height 25
+   #:item-height 24
    (lambda (item state depth open? dc w h)
      (p:draw-pict (item-pict item state depth open? w h) dc 0 0))
    #:context-action context-action))
