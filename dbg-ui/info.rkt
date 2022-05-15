@@ -5,7 +5,7 @@
 (define deps '("base"
                "canvas-list"
                "dbg"
-               ("gui-easy-lib" #:version "0.2.5")
+               ("gui-easy-lib" #:version "0.3")
                "gui-lib"
                "pict-lib"
                "plot-gui-lib"
