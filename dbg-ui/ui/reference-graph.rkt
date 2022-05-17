@@ -66,7 +66,7 @@
      (p:draw-pict (item-pict item state depth open? w h) dc 0 0))
    #:context-action context-action))
 
-(module+ test
+(module+ main
   (require racket/runtime-path)
   (define-runtime-path graph.rktd "testdata/graph.rktd")
   (define graph (call-with-input-file graph.rktd read))
