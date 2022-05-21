@@ -38,10 +38,10 @@
       fg-color)
      (p:colorize
       (p:text
-       (~a
-        (~shortstr (hash-ref item 'str))
-        " @ "
-        (~addr (hash-ref item 'id)))
+       (format "~a @ ~a [#~a]"
+               (~shortstr (hash-ref item 'str))
+               (~addr (hash-ref item 'id))
+               (~hash (hash-ref item 'hash)))
        mono-font/12)
       fg-color)))
   (p:lt-superimpose

@@ -7,7 +7,8 @@
 (provide
  get-object-counts
  get-object-graph
- get-object-graph/by-struct)
+ get-object-graph/by-struct
+ get-object-graph/by-type)
 
 (define enable-object-counts (vm-primitive 'enable-object-counts))
 (define enable-object-backreferences (vm-primitive 'enable-object-backreferences))
@@ -99,6 +100,18 @@
                            (let ([rtd (record-rtd ob)])
                              (eq? name (record-type-name rtd)))))))
 
+(define (get-object-graph/by-type type)
+  (define pred
+    (case type
+      [(bytevector) (vm-primitive 'bytevector?)]
+      [(pair) (vm-primitive 'pair?)]
+      [(procedure) (vm-primitive 'procedure?)]
+      [(string) (vm-primitive 'string?)]
+      [(vector) (vm-primitive 'vector?)]
+      [else (λ (_) #f)]))
+
+  (get-object-graph pred))
+
 (define (->string ob [max-length #f])
   (define str
     (call-with-output-string
@@ -120,4 +133,5 @@
   (hasheq
    'id ob-id
    'str (->string ob 255)
-   'name (and maybe-name (->string maybe-name 255))))
+   'name (and maybe-name (->string maybe-name 255))
+   'hash (equal-hash-code ob)))

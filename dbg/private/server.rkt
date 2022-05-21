@@ -138,6 +138,10 @@
              (write/flush `(object-graph ,id ,(get-object-graph/by-struct (string->symbol name))))
              (loop s)]
 
+            [`(get-type-reference-graph ,id ,type)
+             (write/flush `(object-graph ,id ,(get-object-graph/by-type (string->symbol type))))
+             (loop s)]
+
             [`(start-profile ,id ,delay-ms ,errortrace?)
              (cond
                [(state-sampler s)

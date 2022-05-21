@@ -5,7 +5,8 @@
 
 (provide
  ~addr
- ~shortstr)
+ ~shortstr
+ ~hash)
 
 (define (~addr n)
   (~a "0x" (~r
@@ -18,6 +19,9 @@
   (if (> (string-length s) 70)
       (~a (substring s 0 69) "…")
       s))
+
+(define (~hash h)
+  (~r #:base 16 #:min-width 16 #:pad-string "0" h))
 
 (provide
  mono-font

@@ -3,13 +3,19 @@
 (provide
  get-object-counts
  get-object-graph
- get-object-graph/by-struct)
+ get-object-graph/by-struct
+ get-object-graph/by-type)
 
 (define (get-object-counts)
   null)
 
 (define (get-object-graph _proc)
-  "")
+  (hasheq 'metadata (hasheq)
+          'objects null
+          'links (hasheq)))
 
-(define (get-object-graph/by-struct name)
-  "digraph {}")
+(define (get-object-graph/by-struct _name)
+  (get-object-graph void))
+
+(define (get-object-graph/by-type _type)
+  (get-object-graph void))

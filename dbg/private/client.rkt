@@ -22,6 +22,7 @@
  get-memory-use
  get-object-counts
  get-struct-reference-graph
+ get-type-reference-graph
  start-profile
  stop-profile
  get-profile)
@@ -202,6 +203,9 @@
 
 (define (get-struct-reference-graph name [c (current-client)])
   (cadr (send/sync c get-struct-reference-graph name)))
+
+(define (get-type-reference-graph type [c (current-client)])
+  (cadr (send/sync c get-type-reference-graph type)))
 
 (define (start-profile [c (current-client)] [delay-ms 1] [errortrace? #f])
   (void (send/sync c start-profile delay-ms errortrace?)))

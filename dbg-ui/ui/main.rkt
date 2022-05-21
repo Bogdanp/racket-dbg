@@ -14,10 +14,9 @@
          racket/list
          racket/match
          racket/port
+         "backreference.rkt"
          "common.rkt"
-         "dot.rkt"
          "profile.rkt"
-         "reference-graph.rkt"
          "tree-map.rkt")
 
 (provide
@@ -215,39 +214,13 @@
           (case event
             [(dclick)
              (define entry (vector-ref entries selection))
-             (match (car entry)
-               [(regexp #rx"<struct-type:([^>]+)>" (list _ name))
-                (define graph
-                  (get-struct-reference-graph name c))
-                (define root
-                  (render
-                   (window
-                    #:title (format "~a Backreferences" name)
-                    #:size '(800 600)
-                    (reference-graph
-                     graph
-                     (lambda (item event)
-                       (render-popup-menu
-                        root
-                        (popup-menu
-                         (menu-item
-                          "Save Graph..."
-                          (λ ()
-                            (write-graph-pdf
-                             (gui:put-file "Save Graph..." #f #f #f #f null '(("PDF" "*.pdf")))
-                             graph
-                             (hash-ref item 'id))))
-                         (menu-item
-                          "Copy..."
-                          (λ ()
-                            (send
-                             gui:the-clipboard
-                             set-clipboard-string
-                             (hash-ref item 'str)
-                             (send event get-time-stamp)))))
-                        (send event get-x)
-                        (send event get-y)))))))
-                (void)])]))))]
+             (define-values (name graph)
+               (match (car entry)
+                 [(regexp #rx"<struct-type:(.+)>" (list _ name)) ;; intentionally-greedy regexp
+                  (values name (get-struct-reference-graph name c))]
+                 [type
+                  (values type (get-type-reference-graph type c))]))
+             (render-backreferences name graph)]))))]
     [else
      (text "Loading...")])))
 
