@@ -137,11 +137,13 @@
              (loop s)]
 
             [`(get-struct-reference-graph ,id ,name)
-             (write/flush `(object-graph ,id ,(get-object-graph/by-struct (string->symbol name))))
+             (with-handlers ([exn:fail? (λ (e) (write/flush `(error ,id ,(exn-message e))))])
+               (write/flush `(object-graph ,id ,(get-object-graph/by-struct (string->symbol name)))))
              (loop s)]
 
             [`(get-type-reference-graph ,id ,type)
-             (write/flush `(object-graph ,id ,(get-object-graph/by-type (string->symbol type))))
+             (with-handlers ([exn:fail? (λ (e) (write/flush `(error ,id ,(exn-message e))))])
+               (write/flush `(object-graph ,id ,(get-object-graph/by-type (string->symbol type)))))
              (loop s)]
 
             [`(start-profile ,id ,delay-ms ,errortrace?)
