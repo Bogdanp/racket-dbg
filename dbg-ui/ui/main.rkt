@@ -122,7 +122,9 @@
    (labeled "Operating system:" (text (~a (hash-ref info 'os*))))
    (labeled "Virtual machine:" (text (~a (hash-ref info 'vm))))
    (labeled "Architecture:" (text (~a (hash-ref info 'arch))))
-   (labeled "Version:" (text (hash-ref info 'version)))))
+   (labeled "Version:" (text (hash-ref info 'version)))
+   (labeled "Hostname:" (text (hash-ref info 'hostname)))
+   (labeled "Process ID:" (text (~a (hash-ref info 'pid))))))
 
 (define (charts-tab @state action)
   (define/obs @have-gc-data?
