@@ -4,7 +4,7 @@
          profile/render-json
          profile/sampler
          racket/match
-         racket/port
+         racket/os
          racket/tcp
          "common.rkt"
          "memory.rkt")
@@ -22,7 +22,9 @@
   (hash-set*
    (for/hasheq ([k (in-list '(os* arch vm))])
      (values k (system-type k)))
-   'version (version)))
+   'version (version)
+   'pid (getpid)
+   'hostname (gethostname)))
 
 (define (serve #:host [host "127.0.0.1"]
                #:port [port 9011])
