@@ -18,9 +18,7 @@
     (string-replace
      (~a
       (~shortstr
-       (or
-        (hash-ref meta 'name)
-        (hash-ref meta 'str)))
+       (hash-ref meta 'str))
       " @ "
       (~addr id))
      "\""

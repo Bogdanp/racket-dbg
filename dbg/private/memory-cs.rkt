@@ -129,15 +129,9 @@
      str]))
 
 (define (object-metadata ob ob-id)
-  (define maybe-name
-    ;; Some things (eg. `flat-ellipsis-rest-arg') actively raise an
-    ;; error when you try to get their name.
-    (with-handlers ([exn:fail? (λ (_e) #f)])
-      (object-name ob)))
   (hasheq
    'id ob-id
    'str (->string ob 255)
-   'name (and maybe-name (->string maybe-name 255))
    'hash (equal-hash-code ob)))
 
 (define (call-with-limited-output-string cap proc)
