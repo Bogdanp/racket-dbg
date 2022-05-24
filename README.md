@@ -3,7 +3,6 @@
 # dbg
 
 A server, client and UI for remotely debugging Racket applications.
-Very much a work in progress.
 
 ## Usage
 ### Run a server
