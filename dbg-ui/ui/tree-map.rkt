@@ -274,7 +274,7 @@
        [action action]
        [format-data data->label]))
 
-(module+ test
+(module+ main
   (render
    (window
     #:size '(400 400)
