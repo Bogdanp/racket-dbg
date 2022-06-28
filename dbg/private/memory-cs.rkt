@@ -102,6 +102,7 @@
 (define (get-object-graph/by-type type)
   (define pred
     (case type
+      [(|#<struct-type>|) (vm-primitive 'struct-type?)]
       [(bignum) (vm-primitive 'bignum?)]
       [(box) (vm-primitive 'box?)]
       [(bytevector) (vm-primitive 'bytevector?)]
@@ -131,7 +132,8 @@
 (define (object-metadata ob ob-id)
   (hasheq
    'id ob-id
-   'str (->string ob 255)
+   'str (with-handlers ([exn:fail? (λ (_) "#<unknown>")])
+          (->string ob 255))
    'hash (equal-hash-code ob)))
 
 (define (call-with-limited-output-string cap proc)
