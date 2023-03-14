@@ -13,6 +13,7 @@
          racket/gui/easy/operator
          racket/list
          racket/match
+         racket/math
          racket/port
          "backreference.rkt"
          "common.rkt"
@@ -521,7 +522,7 @@
   (~a #:width width #:pad-string "0" #:align 'right n))
 
 (define (~duration ms)
-  (let ([ms (floor ms)])
+  (let ([ms (exact-floor ms)])
     (~a (pad (quotient ms 3600000)) ":"
         (pad (modulo (quotient ms 60000) 3600)) ":"
         (pad (modulo (quotient ms 1000)  60)) "."
