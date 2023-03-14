@@ -240,22 +240,10 @@
    (hash-ref e 'name)
    (prof:json->profile (hash-ref e 'prof))))
 
-(define (performance-tab c)
-  (define/obs @recordings null)
-  (define/obs @recording? #f)
-  (define/obs @errortrace? #f)
+(define (performance-tab c @recordings @recording? @errortrace?
+                         #:toggle-recording toggle-recording
+                         #:toggle-errortrace? toggle-errortrace?)
   (define/obs @selection #f)
-  (define (toggle-recording)
-    (@recording? . <~ . (λ (on?)
-                          (begin0 (not on?)
-                            (cond
-                              [on?
-                               (@recordings . <~ . (λ (rs)
-                                                     (define name (format "Recording #~a" (add1 (length rs))))
-                                                     (define prof (stop-profile c))
-                                                     (append rs `(,(recording name prof)))))]
-                              [else
-                               (start-profile c 1 (obs-peek @errortrace?))])))))
   (hpanel
    (vpanel
     (hpanel
@@ -266,10 +254,12 @@
                              (if on?
                                  "Stop recording..."
                                  "Start recording...")))
-       (λ () (defer (toggle-recording))))
+       (λ () (defer (toggle-recording c))))
       (checkbox
        #:label "Errortrace?"
-       (λ:= @errortrace?)))
+       #:checked? @errortrace?
+       #:enabled? (@recording? . ~> . not)
+       toggle-errortrace?))
      (hpanel
       #:alignment '(right center)
       (button
@@ -386,6 +376,9 @@
      @state))
   (start-async-handler @state c)
   (subscribe c 'gc)
+  (define/obs @recordings null)
+  (define/obs @recording? #f)
+  (define/obs @errortrace? #f)
   (render
    (window
     #:title "Remote Debugger"
@@ -427,7 +420,20 @@
         (memory-tab c)]
 
        [(performance)
-        (performance-tab c)]
+        (performance-tab
+         c @recordings @recording? @errortrace?
+         #:toggle-errortrace? (λ:= @errortrace?)
+         #:toggle-recording (λ (c)
+                              (@recording? . <~ . (λ (on?)
+                                                    (begin0 (not on?)
+                                                      (cond
+                                                        [on?
+                                                         (@recordings . <~ . (λ (rs)
+                                                                               (define name (format "Recording #~a" (add1 (length rs))))
+                                                                               (define prof (stop-profile c))
+                                                                               (append rs `(,(recording name prof)))))]
+                                                        [else
+                                                         (start-profile c 1 (obs-peek @errortrace?))]))))))]
 
        [else
         (hpanel)])))))
@@ -523,7 +529,7 @@
   (/ v 1024 1024))
 
 (define (~ms v)
-  (format "~a ms" v))
+  (format "~a ms" (exact-floor v)))
 
 (define (pad n [width 2])
   (~a #:width width #:pad-string "0" #:align 'right n))
