@@ -309,63 +309,70 @@
           (define rec (vector-ref entries selection))
           (define prof (recording-prof rec))
           (define nodes (sort (prof:profile-nodes prof) #:key prof:node-total >))
-          (define/obs @tab 'tree-map)
-          (define/obs @tree (profile-node->tree-map-tree (car nodes)))
-          (render
-           (dialog
-            #:title (recording-name rec)
-            #:size '(800 600)
-            (tabs
-             '(tree-map text)
-             #:choice->label (compose1 string-titlecase symbol->string)
-             (λ (e _choices tab)
-               (case e
-                 [(select)
-                  (@tab . := . tab)]))
-             (case-view @tab
-               [(tree-map)
-                (vpanel
-                 (hpanel
-                  #:stretch '(#t #f)
-                  #:alignment '(center center)
-                  (choice
-                   nodes
-                   #:choice->label (λ (n)
-                                     (format "~a (~a)"
-                                             (~profile-node n)
-                                             (prof:node-total n)))
-                   #:selection (@tree . ~> . node-data)
-                   (λ (n)
-                     (@tree . := . (profile-node->tree-map-tree n)))))
-                 (let ([st null])
-                   (tree-map
-                    @tree
-                    #:scale 1
-                    #:action (λ (e n)
-                               (case e
-                                 [(dclick)
-                                  (when n
-                                    (@tree . <~ . (λ (tree)
-                                                    (set! st (cons tree st))
-                                                    (profile-node->tree-map-tree n))))]
-                                 [(rclick)
-                                  (unless (null? st)
-                                    (@tree . := . (car st))
-                                    (set! st (cdr st)))]))
-                    #:data->label ~profile-node)))]
+          (cond
+            [(null? nodes)
+             (gui:message-box
+              "Recording Error"
+              "The recording is empty."
+              #f '(ok caution))]
+            [else
+             (define/obs @tab 'tree-map)
+             (define/obs @tree (profile-node->tree-map-tree (car nodes)))
+             (render
+              (dialog
+               #:title (recording-name rec)
+               #:size '(800 600)
+               (tabs
+                '(tree-map text)
+                #:choice->label (compose1 string-titlecase symbol->string)
+                (λ (e _choices tab)
+                  (case e
+                    [(select)
+                     (@tab . := . tab)]))
+                (case-view @tab
+                  [(tree-map)
+                   (vpanel
+                    (hpanel
+                     #:stretch '(#t #f)
+                     #:alignment '(center center)
+                     (choice
+                      nodes
+                      #:choice->label (λ (n)
+                                        (format "~a (~a)"
+                                                (~profile-node n)
+                                                (prof:node-total n)))
+                      #:selection (@tree . ~> . node-data)
+                      (λ (n)
+                        (@tree . := . (profile-node->tree-map-tree n)))))
+                    (let ([st null])
+                      (tree-map
+                       @tree
+                       #:scale 1
+                       #:action (λ (e n)
+                                  (case e
+                                    [(dclick)
+                                     (when n
+                                       (@tree . <~ . (λ (tree)
+                                                       (set! st (cons tree st))
+                                                       (profile-node->tree-map-tree n))))]
+                                    [(rclick)
+                                     (unless (null? st)
+                                       (@tree . := . (car st))
+                                       (set! st (cdr st)))]))
+                       #:data->label ~profile-node)))]
 
-               [(text)
-                (hpanel
-                 (input
-                  #:font mono-font
-                  #:style '(multiple)
-                  #:stretch '(#t #t)
-                  (with-output-to-string
-                    (lambda ()
-                      (prof:render prof)))))]
+                  [(text)
+                   (hpanel
+                    (input
+                     #:font mono-font
+                     #:style '(multiple)
+                     #:stretch '(#t #t)
+                     (with-output-to-string
+                       (lambda ()
+                         (prof:render prof)))))]
 
-               [else
-                (hpanel)]))))]))))))
+                  [else
+                   (hpanel)]))))])]))))))
 
 (define (start-ui c)
   (define/obs @tab 'info)
