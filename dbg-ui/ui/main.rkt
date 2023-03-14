@@ -529,7 +529,7 @@
   (/ v 1024 1024))
 
 (define (~ms v)
-  (format "~a ms" (exact-floor v)))
+  (format "~a ms" (~r #:precision '(= 2) v)))
 
 (define (pad n [width 2])
   (~a #:width width #:pad-string "0" #:align 'right n))
