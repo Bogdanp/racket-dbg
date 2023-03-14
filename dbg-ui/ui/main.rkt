@@ -241,8 +241,9 @@
    (prof:json->profile (hash-ref e 'prof))))
 
 (define (performance-tab c @recordings @recording? @errortrace?
+                         #:toggle-errortrace? toggle-errortrace?
                          #:toggle-recording toggle-recording
-                         #:toggle-errortrace? toggle-errortrace?)
+                         #:import-recording import-recording)
   (define/obs @selection #f)
   (hpanel
    (vpanel
@@ -272,8 +273,7 @@
              (call-with-input-file filename
                (lambda (in)
                  (jsexpr->recording (read-json in)))))
-           (@recordings . <~ . (λ (recordings)
-                                 (cons rec recordings))))))
+           (import-recording rec))))
       (button
        "&Export..."
        #:enabled? (@selection . ~> . (compose1 not not))
@@ -433,7 +433,10 @@
                                                                                (define prof (stop-profile c))
                                                                                (append rs `(,(recording name prof)))))]
                                                         [else
-                                                         (start-profile c 1 (obs-peek @errortrace?))]))))))]
+                                                         (start-profile c 1 (obs-peek @errortrace?))])))))
+         #:import-recording (λ (rec)
+                              (@recordings . <~ . (λ (recordings)
+                                                    (cons rec recordings)))))]
 
        [else
         (hpanel)])))))
