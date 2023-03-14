@@ -521,10 +521,11 @@
   (~a #:width width #:pad-string "0" #:align 'right n))
 
 (define (~duration ms)
-  (~a (pad (quotient ms 3600000)) ":"
-      (pad (modulo (quotient ms 60000) 3600)) ":"
-      (pad (modulo (quotient ms 1000)  60)) "."
-      (pad (modulo ms 1000) 3)))
+  (let ([ms (floor ms)])
+    (~a (pad (quotient ms 3600000)) ":"
+        (pad (modulo (quotient ms 60000) 3600)) ":"
+        (pad (modulo (quotient ms 1000)  60)) "."
+        (pad (modulo ms 1000) 3))))
 
 (define (~size bs)
   (define-values (n suffix)
