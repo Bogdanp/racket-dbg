@@ -1,7 +1,7 @@
 #lang info
 
 (define license 'BSD-3-Clause)
-(define version "0.1.2")
+(define version "0.1.3")
 (define collection "debugging")
 (define deps '("base"
                "canvas-list"
