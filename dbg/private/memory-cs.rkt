@@ -123,7 +123,7 @@
         (call-with-limited-output-string max-length (λ (out) (write ob out)))
         (call-with-output-string (λ (out) (write ob out)))))
   (cond
-    [(and max-length (> (string-length str) max-length))
+    [(and max-length (>= (string-length str) max-length))
      (string-set! str (sub1 max-length) #\…)
      (substring str 0 max-length)]
     [else
