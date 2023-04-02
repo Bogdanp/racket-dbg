@@ -109,6 +109,7 @@
       [(continuation) (vm-primitive 'continuation?)]
       [(ephemeron) (vm-primitive 'ephemeron?)]
       [(fxvecotr) (vm-primitive 'fxvector?)]
+      [(keyword) (vm-primitive 'keyword?)]
       [(pair) (vm-primitive 'pair?)]
       [(procedure) (vm-primitive 'procedure?)]
       [(stencil-vector) (vm-primitive 'stencil-vector?)]
@@ -116,6 +117,8 @@
       [(symbol) (vm-primitive 'symbol?)]
       [(thread) thread?]
       [(vector) (vm-primitive 'vector?)]
+      [(weakpair) (vm-primitive 'weak-pair?)]
+      [(will-executor) (vm-primitive 'will-executor?)]
       [else (λ (ob)
               (and (record? ob)
                    (let ([rtd (record-rtd ob)])
