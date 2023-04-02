@@ -92,8 +92,8 @@
   (define message-evt
     (handle-evt client-in read))
   (parameterize ([current-output-port client-out])
-    (let loop ([s (make-state)])
-      (with-handlers ([exn:fail:network? (λ (_e) (disconnect))])
+    (with-handlers ([exn:fail:network? (λ (_e) (disconnect))])
+      (let loop ([s (make-state)])
         (sync
          (handle-evt
           async-ch
