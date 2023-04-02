@@ -17,6 +17,7 @@
 (define record? (vm-primitive 'record?))
 (define record-rtd (vm-primitive 'record-rtd))
 (define record-type-name (vm-primitive 'record-type-name))
+(define record-type-descriptor? (vm-primitive 'record-type-descriptor?))
 
 (define (call-with-counts proc)
   (call-as-atomic
@@ -36,7 +37,7 @@
      (lambda (counts _backrefs)
        (for*/fold ([res (hash)])
                   ([c (in-list counts)]
-                   [str (in-value (->string (car c)))]
+                   [str (in-value (type->string (car c)))]
                    [gen (in-list (cdr c))])
          (hash-update res str
                       (λ (cnt)
@@ -102,18 +103,23 @@
 (define (get-object-graph/by-type type)
   (define pred
     (case type
-      [(|#<struct-type>|) (vm-primitive 'struct-type?)]
       [(bignum) (vm-primitive 'bignum?)]
       [(box) (vm-primitive 'box?)]
       [(bytevector) (vm-primitive 'bytevector?)]
+      [(continuation) (vm-primitive 'continuation?)]
       [(ephemeron) (vm-primitive 'ephemeron?)]
+      [(fxvecotr) (vm-primitive 'fxvector?)]
       [(pair) (vm-primitive 'pair?)]
       [(procedure) (vm-primitive 'procedure?)]
+      [(stencil-vector) (vm-primitive 'stencil-vector?)]
       [(string) (vm-primitive 'string?)]
       [(symbol) (vm-primitive 'symbol?)]
       [(thread) thread?]
       [(vector) (vm-primitive 'vector?)]
-      [else (λ (_) #f)]))
+      [else (λ (ob)
+              (and (record? ob)
+                   (let ([rtd (record-rtd ob)])
+                     (eq? (record-type-name rtd) type))))]))
 
   (get-object-graph pred))
 
@@ -165,3 +171,9 @@
       (proc out)
       (subbytes out-bs 0 len)))
   (bytes->string/utf-8 res-bs #\�))
+
+(define (type->string t)
+  (symbol->string
+   (if (record-type-descriptor? t)
+       (record-type-name t)
+       t)))
