@@ -136,14 +136,9 @@
              (write/flush `(object-counts ,id ,(get-object-counts)))
              (loop s)]
 
-            [`(get-struct-reference-graph ,id ,name)
+            [`(get-reference-graph ,id ,type)
              (with-handlers ([exn:fail? (λ (e) (write/flush `(error ,id ,(exn-message e))))])
-               (write/flush `(object-graph ,id ,(get-object-graph/by-struct (string->symbol name)))))
-             (loop s)]
-
-            [`(get-type-reference-graph ,id ,type)
-             (with-handlers ([exn:fail? (λ (e) (write/flush `(error ,id ,(exn-message e))))])
-               (write/flush `(object-graph ,id ,(get-object-graph/by-type (string->symbol type)))))
+               (write/flush `(object-graph ,id ,(get-object-graph/by-type type))))
              (loop s)]
 
             [`(start-profile ,id ,delay-ms ,errortrace?)

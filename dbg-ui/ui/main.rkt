@@ -216,14 +216,9 @@
         (when selection
           (case event
             [(dclick)
-             (define entry (vector-ref entries selection))
-             (define-values (name graph)
-               (match (car entry)
-                 [(regexp #rx"<struct-type:(.+)>" (list _ name)) ;; intentionally-greedy regexp
-                  (values name (get-struct-reference-graph name c))]
-                 [type
-                  (values type (get-type-reference-graph type c))]))
-             (render-backreferences name graph)]))))]
+             (define type (car (vector-ref entries selection)))
+             (define graph (get-reference-graph (string->symbol type) c))
+             (render-backreferences type graph)]))))]
     [else
      (text "Loading...")])))
 

@@ -7,7 +7,6 @@
 (provide
  get-object-counts
  get-object-graph
- get-object-graph/by-struct
  get-object-graph/by-type)
 
 (define enable-object-counts (vm-primitive 'enable-object-counts))
@@ -94,37 +93,29 @@
    'objects objects
    'links links))
 
-(define (get-object-graph/by-struct name)
-  (get-object-graph (lambda (ob)
-                      (and (record? ob)
-                           (let ([rtd (record-rtd ob)])
-                             (eq? name (record-type-name rtd)))))))
-
 (define (get-object-graph/by-type type)
-  (define pred
-    (case type
-      [(bignum) (vm-primitive 'bignum?)]
-      [(box) (vm-primitive 'box?)]
-      [(bytevector) (vm-primitive 'bytevector?)]
-      [(continuation) (vm-primitive 'continuation?)]
-      [(ephemeron) (vm-primitive 'ephemeron?)]
-      [(fxvecotr) (vm-primitive 'fxvector?)]
-      [(keyword) (vm-primitive 'keyword?)]
-      [(pair) (vm-primitive 'pair?)]
-      [(procedure) (vm-primitive 'procedure?)]
-      [(stencil-vector) (vm-primitive 'stencil-vector?)]
-      [(string) (vm-primitive 'string?)]
-      [(symbol) (vm-primitive 'symbol?)]
-      [(thread) thread?]
-      [(vector) (vm-primitive 'vector?)]
-      [(weakpair) (vm-primitive 'weak-pair?)]
-      [(will-executor) (vm-primitive 'will-executor?)]
-      [else (λ (ob)
-              (and (record? ob)
-                   (let ([rtd (record-rtd ob)])
-                     (eq? (record-type-name rtd) type))))]))
-
-  (get-object-graph pred))
+  (get-object-graph
+   (case type
+     [(bignum) (vm-primitive 'bignum?)]
+     [(box) (vm-primitive 'box?)]
+     [(bytevector) (vm-primitive 'bytevector?)]
+     [(continuation) (vm-primitive 'continuation?)]
+     [(ephemeron) (vm-primitive 'ephemeron?)]
+     [(fxvecotr) (vm-primitive 'fxvector?)]
+     [(keyword) (vm-primitive 'keyword?)]
+     [(pair) (vm-primitive 'pair?)]
+     [(procedure) (vm-primitive 'procedure?)]
+     [(stencil-vector) (vm-primitive 'stencil-vector?)]
+     [(string) (vm-primitive 'string?)]
+     [(symbol) (vm-primitive 'symbol?)]
+     [(thread) thread?]
+     [(vector) (vm-primitive 'vector?)]
+     [(weakpair) (vm-primitive 'weak-pair?)]
+     [(will-executor) (vm-primitive 'will-executor?)]
+     [else (λ (ob)
+             (and (record? ob)
+                  (let ([rtd (record-rtd ob)])
+                    (eq? (record-type-name rtd) type))))])))
 
 (define (->string ob [max-length #f])
   (define str
