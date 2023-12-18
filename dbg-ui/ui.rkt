@@ -28,15 +28,37 @@
      #:host host
      #:port port))
 
+  (define reconnect-thd
+   (thread
+    (lambda ()
+      (let outer-loop ()
+        (void (thread-receive))
+        (eprintf "Disconnected. Entering reconnect loop.~n")
+        (let inner-loop ([attempts 0])
+          (sleep (min 5 (* 0.125 (expt 2 attempts))))
+          (with-handlers ([exn:fail? void])
+            (eprintf "Attempting to reconnect to client.~n")
+            (reconnect! conn))
+          (cond
+            [(connected? conn)
+             (eprintf "Connected.~n")
+             (outer-loop)]
+            [else
+             (inner-loop (add1 attempts))]))))))
+
+  (define (try-reconnect)
+    (thread-send reconnect-thd '(reconnect)))
+
   (let/cc esc
     (uncaught-exception-handler
      (λ (e)
        (define message
          (call-with-output-string
-           (λ (out)
-             (parameterize ([current-error-port out])
-               ((error-display-handler) (exn-message e) e)))))
+          (λ (out)
+            (parameterize ([current-error-port out])
+              ((error-display-handler) (exn-message e) e)))))
+       (when (regexp-match #rx"client: not connected" (exn-message e))
+         (try-reconnect))
        (message-box "Error" message #f '(stop ok))
        (esc)))
-
     (void (start-ui conn))))
