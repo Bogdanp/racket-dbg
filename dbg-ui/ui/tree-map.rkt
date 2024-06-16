@@ -360,7 +360,7 @@
 (define (compute-rects n x y w h)
   (define x-end (+ x w))
   (define y-end (+ y h))
-  (define size (node-size n))
+  (define size (max 1 (node-size n)))
   (cons
    (rect (node-data n) x y w h)
    (for/fold ([x x]
@@ -382,6 +382,18 @@
 
 (module+ test
   (require rackunit)
+
+  (check-equal?
+   (compute-rects
+    (node "a" 0
+          (list
+           (node "b" 0 null)
+           (node "c" 0 null)))
+    0 0 200 100)
+   (list
+    (rect "a" 0 0 200 100)
+    (rect "b" 0 0 0   100)
+    (rect "c" 0 0 0   100)))
 
   (check-equal?
    (compute-rects

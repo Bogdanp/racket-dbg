@@ -1,7 +1,6 @@
 #lang racket/base
 
 (require (prefix-in p: pict)
-         racket/format
          racket/gui/easy
          "common.rkt"
          "resource.rkt"
