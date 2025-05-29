@@ -47,7 +47,7 @@
       [else (format " (~a times)" reps)]))
   (if proc
       (fprintf out " ~a~a~n" proc reps-str)
-      (fprintf out " <unknown function>~a~n" reps-str)))
+      (fprintf out " <unknown procedure>~a~n" reps-str)))
 
 (define (display-srcloc loc out)
   (match-define (srcloc source line column position _) loc)
