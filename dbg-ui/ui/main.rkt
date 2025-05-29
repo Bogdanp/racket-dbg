@@ -235,6 +235,23 @@
    (hash-ref e 'name)
    (prof:json->profile (hash-ref e 'prof))))
 
+(define (threads-tab c)
+  (define/obs @thread-dump
+    (dump-threads c))
+  (vpanel
+   (hpanel
+    #:alignment '(right center)
+    #:stretch '(#t #f)
+    (button
+     "Reload"
+     (lambda ()
+       (@thread-dump . := . (dump-threads c)))))
+   (input
+    #:font mono-font
+    #:style '(multiple)
+    #:stretch '(#t #t)
+    @thread-dump)))
+
 (define (performance-tab c @recordings @recording? @errortrace?
                          #:toggle-errortrace? toggle-errortrace?
                          #:toggle-recording toggle-recording
@@ -393,7 +410,7 @@
        (λ ()
          ((gui:application-quit-handler))))))
     (tabs
-     '(info charts memory performance)
+     '(info charts memory threads performance)
      #:choice->label (compose1 string-titlecase symbol->string)
      (λ (event _choices tab)
        (case event
@@ -413,6 +430,9 @@
 
        [(memory)
         (memory-tab c)]
+
+       [(threads)
+        (threads-tab c)]
 
        [(performance)
         (performance-tab
