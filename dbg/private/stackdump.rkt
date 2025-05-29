@@ -46,7 +46,7 @@
   (define reps-str
     (cond
       [(= reps 1) ""]
-      [else (format " (~a times)" reps)]))
+      [else (format " [repeats ~a times]" reps)]))
   (if proc
       (fprintf out " ~a~a~n" proc reps-str)
       (fprintf out " <unknown procedure>~a~n" reps-str)))
