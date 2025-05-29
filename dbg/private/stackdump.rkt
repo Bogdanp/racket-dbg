@@ -15,6 +15,8 @@
        (display-stack v out)]
       [(custodian? v)
        (for-each loop (custodian-managed-list v root))]
+      [(list? v)
+       (for-each loop v)]
       [else
        (void)])))
 
