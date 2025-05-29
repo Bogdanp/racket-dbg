@@ -24,7 +24,8 @@
  get-reference-graph
  start-profile
  stop-profile
- get-profile)
+ get-profile
+ dump-threads)
 
 (define current-client
   (make-parameter #f))
@@ -211,3 +212,6 @@
 
 (define (get-profile [c (current-client)])
   (json->profile (cadr (send/sync c get-profile))))
+
+(define (dump-threads [c (current-client)])
+  (cadr (send/sync c dump-threads)))

@@ -7,5 +7,6 @@
  (contract-out
   [serve (->* []
               [#:host string?
-               #:port (integer-in 0 65535)]
+               #:port (integer-in 0 65535)
+               #:custodian custodian?]
               (-> void?))]))

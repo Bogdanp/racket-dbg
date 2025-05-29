@@ -5,9 +5,11 @@
          profile/sampler
          racket/match
          racket/os
+         racket/port
          racket/tcp
          "common.rkt"
-         "memory.rkt")
+         "memory.rkt"
+         "stackdump.rkt")
 
 (provide
  serve)
@@ -27,9 +29,10 @@
    'hostname (gethostname)))
 
 (define (serve #:host [host "127.0.0.1"]
-               #:port [port 9011])
+               #:port [port 9011]
+               #:custodian [root (current-custodian)])
   (define cust (make-custodian))
-  (current-root-custodian (current-custodian))
+  (current-root-custodian root)
   (current-prof-custodian cust)
   (current-custodian cust)
   (define cmd-ch (make-channel))
@@ -178,6 +181,17 @@
                [else
                 (write/flush `(error ,id "a profile is not currently running"))
                 (loop s)])]
+
+            [`(dump-threads ,id)
+             (define thread-dump
+               (call-with-output-string
+                (lambda (out)
+                  (display-thread-stacks
+                   (current-prof-custodian)
+                   (current-root-custodian)
+                   out))))
+             (write/flush `(ok ,id ,thread-dump))
+             (loop s)]
 
             [`(,cmd ,id ,args ...)
              (write/flush `(error ,id ,(format "invalid message: ~e" `(,cmd ,@args))))

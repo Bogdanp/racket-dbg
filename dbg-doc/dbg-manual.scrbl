@@ -45,15 +45,21 @@ The @tt{dbg} package provides two top-level modules, representing the
 @defmodule[debugging/server]
 
 @defproc[(serve [#:host host string? "127.0.0.1"]
-                [#:port port (integer-in 0 65535) 9011]) (-> void?)]{
+                [#:port port (integer-in 0 65535) 9011]
+                [#:custodian custodian custodian? (current-custodian)]) (-> void?)]{
 
-  Runs a debugging server bound to @racket[port] on @racket[host] in
-  the background and returns a function that stops the server when
+  Runs a background debugging server bound to @racket[port] on
+  @racket[host] and returns a function that stops the server when
   called.
 
-  The server replaces the @racket[current-custodian] in order to aid
-  with profiling, so the earlier you start the server during your
-  app's boot process, the better.
+  The server replaces the @racket[current-custodian] in order to
+  aid with profiling, so the earlier you start the server during
+  your app's boot process, the better. Alternatively, you may pass a
+  @racket[#:custodian] to ensure that profiling and thread dumping
+  can access threads and other custodians belonging to it and its
+  descendants.
+
+  @history[#:changed "0.3" @elem{Added the @racket[#:custodian] argument.}]
 }
 
 @subsection{Client}
@@ -121,4 +127,11 @@ The client API may change between versions without warning.
 
 @defproc[(get-profile [c client? (current-client)]) any/c]{
   Gets the last profile from the process being debugged.
+}
+
+@defproc[(dump-threads [c client? (current-client)]) string?]{
+  Returns a string representing all the threads accessible via the
+  server's custodian and their stack frames.
+
+  @history[#:added "0.3"]
 }
