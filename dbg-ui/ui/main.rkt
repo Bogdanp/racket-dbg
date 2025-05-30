@@ -240,8 +240,9 @@
     (dump-threads c))
   (vpanel
    (hpanel
-    #:alignment '(right center)
     #:stretch '(#t #f)
+    (text "Threads reachable from the root custodian and its subordinates.")
+    (spacer)
     (button
      "Reload"
      (lambda ()
