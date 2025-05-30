@@ -74,6 +74,20 @@
                 (hash-set graph 'objects (for*/list ([h (in-list sorted-hashes)]
                                                      [id (in-list (hash-ref hashes-to-ids h))])
                                            id)))
+              (render-backreferences what sorted-graph)))
+           (menu-item
+            "Sort by length..."
+            (λ ()
+              (define objects (hash-ref graph 'objects))
+              (define metadata (hash-ref graph 'metadata))
+              (define sorted-graph
+                (hash-set
+                 graph 'objects
+                 (sort
+                  objects
+                  #;cmp >
+                  #:key (lambda (id)
+                          (hash-ref (hash-ref metadata id) 'len)))))
               (render-backreferences what sorted-graph))))
           (send event get-x)
           (send event get-y)))))))

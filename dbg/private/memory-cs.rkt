@@ -17,6 +17,10 @@
 (define record-rtd (vm-primitive 'record-rtd))
 (define record-type-name (vm-primitive 'record-type-name))
 (define record-type-descriptor? (vm-primitive 'record-type-descriptor?))
+(define bytevector? (vm-primitive 'bytevector?))
+(define bytevector-length (vm-primitive 'bytevector-length))
+(define cs:string? (vm-primitive 'string?))
+(define cs:string-length (vm-primitive 'string-length))
 
 (define (call-with-counts proc)
   (call-as-atomic
@@ -132,6 +136,7 @@
 (define (object-metadata ob ob-id)
   (hasheq
    'id ob-id
+   'len (object-length ob)
    'str (with-handlers ([exn:fail? (λ (_) "#<unknown>")])
           (->string ob 255))
    'hash (equal-hash-code ob)))
@@ -171,3 +176,11 @@
    (if (record-type-descriptor? t)
        (record-type-name t)
        t)))
+
+(define (object-length ob)
+  (cond
+    [(bytevector? ob)
+     (bytevector-length ob)]
+    [(cs:string? ob)
+     (cs:string-length ob)]
+    [else -1]))
