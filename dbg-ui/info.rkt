@@ -1,11 +1,11 @@
 #lang info
 
 (define license 'BSD-3-Clause)
-(define version "0.1.3")
+(define version "0.2")
 (define collection "debugging")
 (define deps '("base"
                "canvas-list"
-               "dbg"
+               ["dbg" #:version "0.4"]
                ["gui-easy-lib" #:version "0.16.1"]
                "gui-lib"
                "pict-lib"
