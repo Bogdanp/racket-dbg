@@ -9,10 +9,13 @@
          [cust (current-custodian)]
          [root (current-custodian)]
          [out (current-output-port)])
+  (define seen (make-hasheq))
   (let loop ([v cust])
     (cond
       [(thread? v)
-       (display-stack v out)]
+       (unless (hash-has-key? seen v)
+         (hash-set! seen v #t)
+         (display-stack v out))]
       [(custodian? v)
        (for-each loop (custodian-managed-list v root))]
       [(list? v)
