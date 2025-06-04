@@ -1,9 +1,10 @@
 #lang racket/base
 
-(require racket/contract
+(require racket/contract/base
          "private/client.rkt"
          (except-in "private/memory.rkt"
-                    get-object-counts))
+                    get-object-counts
+                    get-object-counts-by-module))
 
 (provide
  (struct-out gc-info)
@@ -24,8 +25,9 @@
   [get-memory-use (client-> exact-positive-integer?)]
   [get-object-counts (client-> (listof (cons/c string? (cons/c exact-nonnegative-integer?
                                                                exact-nonnegative-integer?))))]
+  [get-object-counts-by-module (client-> symbol? (listof (cons/c string? exact-nonnegative-integer?)))]
   [get-reference-graph (client-> symbol? hash?)]
-  [start-profile (->* () (client? exact-nonnegative-integer? boolean?) void?)]
+  [start-profile (->* [] [client? exact-nonnegative-integer? boolean?] void?)]
   [stop-profile (client-> any/c)]
   [get-profile (client-> any/c)]
   [dump-threads (client-> string?)]))
