@@ -108,6 +108,14 @@ The client API may change between versions without warning.
   the process being debugged, grouped by type.
 }
 
+@defproc[(get-object-counts-by-module [type symbol?]
+                                      [c client? (current-client)]) (listof (cons/c string? integer?))]{
+  Gets the total number of objects of @racket[type] reachable by a
+  module, grouped by each module.
+
+  @history[#:added "0.5"]
+}
+
 @defproc[(start-profile [c client? (current-client)]
                         [delay-ms exact-nonnegative-integer? 1]
                         [errortrace? boolean? #f]) void?]{
