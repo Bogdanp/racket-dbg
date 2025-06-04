@@ -21,6 +21,7 @@
  get-info
  get-memory-use
  get-object-counts
+ get-object-counts-by-module
  get-reference-graph
  start-profile
  stop-profile
@@ -200,6 +201,9 @@
 
 (define (get-object-counts [c (current-client)])
   (cadr (send/sync c get-object-counts)))
+
+(define (get-object-counts-by-module type [c (current-client)])
+  (cadr (send/sync c get-object-counts-by-module type)))
 
 (define (get-reference-graph type [c (current-client)])
   (cadr (send/sync c get-reference-graph type)))

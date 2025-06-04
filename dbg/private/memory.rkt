@@ -4,6 +4,7 @@
 
 (provide
  get-object-counts
+ get-object-counts-by-module
  get-object-graph/by-type)
 
 (define-runtime-module-path bc-mod "memory-bc.rkt")
@@ -15,6 +16,9 @@
 
 (define get-object-counts
   (dynamic-require mod-path 'get-object-counts))
+
+(define get-object-counts-by-module
+  (dynamic-require mod-path 'get-object-counts-by-module))
 
 (define get-object-graph/by-type
   (dynamic-require mod-path 'get-object-graph/by-type))

@@ -139,6 +139,10 @@
              (write/flush `(object-counts ,id ,(get-object-counts)))
              (loop s)]
 
+            [`(get-object-counts-by-module ,id ,type)
+             (write/flush `(object-counts-by-module ,id ,(get-object-counts-by-module type)))
+             (loop s)]
+
             [`(get-reference-graph ,id ,type)
              (with-handlers ([exn:fail? (λ (e) (write/flush `(error ,id ,(exn-message e))))])
                (write/flush `(object-graph ,id ,(get-object-graph/by-type type))))

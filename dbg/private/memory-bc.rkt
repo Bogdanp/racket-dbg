@@ -2,10 +2,14 @@
 
 (provide
  get-object-counts
+ get-object-counts-by-module
  get-object-graph
  get-object-graph/by-type)
 
 (define (get-object-counts)
+  null)
+
+(define (get-object-counts-by-module)
   null)
 
 (define (get-object-graph _proc)
