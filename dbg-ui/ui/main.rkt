@@ -17,6 +17,8 @@
          racket/port
          "backreference.rkt"
          "common.rkt"
+         "hacks.rkt"
+         "mixin.rkt"
          "profile.rkt"
          "tree-map.rkt")
 
@@ -24,6 +26,9 @@
  start-ui)
 
 ;; state ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define current-renderer
+  (make-parameter #f))
 
 (struct memory-tick (ts amount)
   #:transparent)
@@ -175,7 +180,13 @@
   (define (compute-total-bytes counts)
     (for/sum ([c (in-list (or counts null))])
       (cddr c)))
-
+  (define/obs @filtered-counts
+    (obs-combine
+     (λ (maybe-counts filter-re)
+       (for/vector ([c (in-list (or maybe-counts null))]
+                    #:when (regexp-match? filter-re (car c)))
+         c))
+     @counts @filter-re))
   (reload)
   (vpanel
    (hpanel
@@ -201,17 +212,41 @@
       '("Kind" "Count" "Size")
       #:margin '(5 5)
       #:column-widths `((0 320))
-      (obs-combine
-       (λ (maybe-counts filter-re)
-         (for/vector ([c (in-list (or maybe-counts null))]
-                      #:when (regexp-match? filter-re (car c)))
-           c))
-       @counts @filter-re)
+      @filtered-counts
       #:entry->row (λ (entry)
                      (vector
                       (car entry)
                       (~a (cadr entry))
                       (~size (cddr entry))))
+      #:mixin
+      (mix-context-event
+       (lambda (event maybe-index)
+         (when maybe-index
+           (define entries (obs-peek @filtered-counts))
+           (define entry (vector-ref entries maybe-index))
+           (render-popup-menu*
+            (current-renderer)
+            (popup-menu
+             (menu-item
+              "Count by Module..."
+              (lambda ()
+                (define type (string->symbol (car entry)))
+                (define counts (get-object-counts-by-module type c))
+                (render
+                 (dialog
+                  #:title "Counts by Module"
+                  #:size '(800 600)
+                  (table
+                   '("Module" "Count")
+                   #:column-widths `((0 700)
+                                     (1  80))
+                   (list->vector counts)
+                   #:entry->row
+                   (λ (e)
+                     (vector
+                      (car e)
+                      (~a (cdr e))))))))))
+            event))))
       (lambda (event entries selection)
         (when selection
           (case event
@@ -392,70 +427,71 @@
   (define/obs @recordings null)
   (define/obs @recording? #f)
   (define/obs @errortrace? #f)
-  (render
-   (window
-    #:title "Remote Debugger"
-    #:size '(600 400)
-    #:mixin (make-window-mixin c)
-    (menu-bar
-     (menu
-      "&File"
-      (menu-item
-       "&Reconnect..."
-       (λ ()
-         (reconnect! c)
-         (subscribe c 'gc)))
-      (menu-item-separator)
-      (menu-item
-       "&Quit"
-       (λ ()
-         ((gui:application-quit-handler))))))
-    (tabs
-     '(info charts memory threads performance)
-     #:choice->label (compose1 string-titlecase symbol->string)
-     (λ (event _choices tab)
-       (case event
-         [(select)
-          (@tab . := . tab)]))
-     (case-view @tab
-       [(info)
-        (info-tab (get-info c))]
+  (current-renderer
+   (render
+    (window
+     #:title "Remote Debugger"
+     #:size '(600 400)
+     #:mixin (make-window-mixin c)
+     (menu-bar
+      (menu
+       "&File"
+       (menu-item
+        "&Reconnect..."
+        (λ ()
+          (reconnect! c)
+          (subscribe c 'gc)))
+       (menu-item-separator)
+       (menu-item
+        "&Quit"
+        (λ ()
+          ((gui:application-quit-handler))))))
+     (tabs
+      '(info charts memory threads performance)
+      #:choice->label (compose1 string-titlecase symbol->string)
+      (λ (event _choices tab)
+        (case event
+          [(select)
+           (@tab . := . tab)]))
+      (case-view @tab
+        [(info)
+         (info-tab (get-info c))]
 
-       [(charts)
-        (charts-tab
-         @state/throttled
-         (match-lambda
-           [`(commit-history ,hist)
-            (@state . <~ . (λ (s)
-                             (struct-copy state s [history hist])))]))]
+        [(charts)
+         (charts-tab
+          @state/throttled
+          (match-lambda
+            [`(commit-history ,hist)
+             (@state . <~ . (λ (s)
+                              (struct-copy state s [history hist])))]))]
 
-       [(memory)
-        (memory-tab c)]
+        [(memory)
+         (memory-tab c)]
 
-       [(threads)
-        (threads-tab c)]
+        [(threads)
+         (threads-tab c)]
 
-       [(performance)
-        (performance-tab
-         c @recordings @recording? @errortrace?
-         #:toggle-errortrace? (λ:= @errortrace?)
-         #:toggle-recording (λ (c)
-                              (@recording? . <~ . (λ (on?)
-                                                    (begin0 (not on?)
-                                                      (cond
-                                                        [on?
-                                                         (@recordings . <~ . (λ (rs)
-                                                                               (define name (format "Recording #~a" (add1 (length rs))))
-                                                                               (define prof (stop-profile c))
-                                                                               (append rs `(,(recording name prof)))))]
-                                                        [else
-                                                         (start-profile c 1 (obs-peek @errortrace?))])))))
-         #:import-recording (λ (rec)
-                              (@recordings . <~ . (λ (recordings)
-                                                    (cons rec recordings)))))]
+        [(performance)
+         (performance-tab
+          c @recordings @recording? @errortrace?
+          #:toggle-errortrace? (λ:= @errortrace?)
+          #:toggle-recording (λ (c)
+                               (@recording? . <~ . (λ (on?)
+                                                     (begin0 (not on?)
+                                                       (cond
+                                                         [on?
+                                                          (@recordings . <~ . (λ (rs)
+                                                                                (define name (format "Recording #~a" (add1 (length rs))))
+                                                                                (define prof (stop-profile c))
+                                                                                (append rs `(,(recording name prof)))))]
+                                                         [else
+                                                          (start-profile c 1 (obs-peek @errortrace?))])))))
+          #:import-recording (λ (rec)
+                               (@recordings . <~ . (λ (recordings)
+                                                     (cons rec recordings)))))]
 
-       [else
-        (hpanel)])))))
+        [else
+         (hpanel)]))))))
 
 (define (plot-memory-usage s w h)
   (parameterize ([plot-title "Memory Use"]
