@@ -16,8 +16,6 @@
          (define maybe-item-index
            (cond
              [(is-a? receiver gui:list-box%)
-              (eprintf "h: ~s n: ~s~n" (send receiver get-height)
-                       (send receiver number-of-visible-items))
               (define item-height
                 (case (system-type 'os)
                   ;; On macOS, the table can display a partial item at the end, depending
