@@ -56,7 +56,7 @@
                       (cons 0 0))))))
   (sort (hash-map counts-by-str cons) #:key cddr >))
 
-;; (-> TYPE (listof (cons/c MODULE  COUNT)))
+;; (-> TYPE (listof (cons/c MODULE COUNT)))
 (define (get-object-counts-by-module type)
   (define ok? (get-predicate type))
   (define counts (make-hash))
