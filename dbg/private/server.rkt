@@ -197,6 +197,15 @@
              (write/flush `(ok ,id ,thread-dump))
              (loop s)]
 
+            [`(find-memory-hogs ,id ,limit)
+             (define hogs
+               (find-memory-hogs
+                limit
+                (current-prof-custodian)
+                (current-root-custodian)))
+             (write/flush `(ok ,id ,hogs))
+             (loop s)]
+
             [`(,cmd ,id ,args ...)
              (write/flush `(error ,id ,(format "invalid message: ~e" `(,cmd ,@args))))
              (loop s)]

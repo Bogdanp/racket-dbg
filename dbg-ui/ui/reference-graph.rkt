@@ -40,8 +40,8 @@
        (format "~a @ ~a [#~a] [~a]"
                (~shortstr (hash-ref item 'str))
                (~addr (hash-ref item 'id))
-               (~hash (hash-ref item 'hash))
-               (hash-ref item 'len))
+               (~hash (hash-ref item 'hash 0))
+               (hash-ref item 'len 0))
        mono-font/12)
       fg-color)))
   (p:lt-superimpose

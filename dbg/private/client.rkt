@@ -26,7 +26,8 @@
  start-profile
  stop-profile
  get-profile
- dump-threads)
+ dump-threads
+ find-memory-hogs)
 
 (define current-client
   (make-parameter #f))
@@ -219,3 +220,6 @@
 
 (define (dump-threads [c (current-client)])
   (cadr (send/sync c dump-threads)))
+
+(define (find-memory-hogs limit [c (current-client)])
+  (cadr (send/sync c find-memory-hogs limit)))

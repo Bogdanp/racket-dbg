@@ -143,3 +143,13 @@ The client API may change between versions without warning.
 
   @history[#:added "0.3"]
 }
+
+@defproc[(find-memory-hogs [limit exact-nonnegative-integer?]
+                           [c client? (current-client)]) any/c]{
+
+  Returns a list of hashes representing custodians and their
+  children custodians & threads for any custodians whose
+  @racket[current-memory-use] is greater than @racket[limit].
+
+  @history[#:added "0.6"]
+}

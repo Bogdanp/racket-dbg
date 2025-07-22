@@ -1,6 +1,7 @@
 #lang racket/base
 
-(require racket/runtime-path)
+(require racket/format
+         racket/runtime-path)
 
 (provide
  get-object-counts
@@ -41,3 +42,41 @@
   (handle-evt
    (make-log-receiver (current-logger) 'debug 'GC)
    (λ (vs) (vector-ref vs 2))))
+
+
+;; Memory Hogs ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(provide
+ find-memory-hogs)
+
+(define (find-memory-hogs limit cust super-cust)
+  (define seen
+    (make-hasheq))
+  (let loop ([v cust])
+    (cond
+      [(hash-has-key? seen v) null]
+      [else
+       (hash-set! seen v #t)
+       (cond
+         [(custodian? v)
+          (define total
+            (current-memory-use v))
+          (if (total . >= . limit)
+              (list
+               (hasheq
+                'id (eq-hash-code v)
+                'kind 'custodian
+                'name (~s v)
+                'total total
+                'children (loop (custodian-managed-list cust super-cust))))
+              null)]
+         [(thread? v)
+          (list
+           (hasheq
+            'id (eq-hash-code v)
+            'kind 'thread
+            'name (~s v)))]
+         [(list? v)
+          (apply append (map loop v))]
+         [else
+          null])])))

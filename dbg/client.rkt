@@ -3,6 +3,7 @@
 (require racket/contract/base
          "private/client.rkt"
          (except-in "private/memory.rkt"
+                    find-memory-hogs
                     get-object-counts
                     get-object-counts-by-module))
 
@@ -30,7 +31,8 @@
   [start-profile (->* [] [client? exact-nonnegative-integer? boolean?] void?)]
   [stop-profile (client-> any/c)]
   [get-profile (client-> any/c)]
-  [dump-threads (client-> string?)]))
+  [dump-threads (client-> string?)]
+  [find-memory-hogs (client-> exact-nonnegative-integer? any/c)]))
 
 (define-syntax-rule (client-> arg/c ... res/c)
   (->* (arg/c ...) (client?) res/c))

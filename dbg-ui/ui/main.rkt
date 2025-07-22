@@ -18,6 +18,7 @@
          "backreference.rkt"
          "common.rkt"
          "hacks.rkt"
+         "hogs.rkt"
          "mixin.rkt"
          "profile.rkt"
          "tree-map.rkt")
@@ -445,7 +446,57 @@
        (menu-item
         "&Quit"
         (λ ()
-          ((gui:application-quit-handler))))))
+          ((gui:application-quit-handler)))))
+      (menu
+       "&Memory"
+       (menu-item
+        "Find Memory &Hogs..."
+        (λ ()
+          (define close! void)
+          (define/obs @limit "100")
+          (define @limit-mb
+            (@limit . ~> . (lambda (limit)
+                             (string->number limit))))
+          (define (go)
+            (close!)
+            (define limit
+              (obs-peek @limit-mb))
+            (when limit
+              (render
+               (window
+                #:title "Memory Hogs"
+                #:size '(800 600)
+                (memory-hogs
+                 (find-memory-hogs limit c)))
+               (current-renderer))))
+          (render
+           (dialog
+            #:title "Find Memory Hogs"
+            #:size '(160 #f)
+            #:mixin (λ (%)
+                      (class %
+                        (super-new)
+                        (set! close! (λ () (send this show #f)))))
+            (vpanel
+             #:alignment '(right top)
+             #:margin '(10 10)
+             (hpanel
+              (text "Limit:")
+              (input
+               @limit
+               #:background-color
+               (@limit-mb . ~> . (λ (limit)
+                                   (if limit #f (color "red"))))
+               (lambda (event text)
+                 (@limit . := . text)
+                 (when (eq? event 'return)
+                   (go))))
+              (text "MB"))
+             (button
+              #:enabled?
+              (@limit-mb . ~> . (compose1 not not))
+              "Find Hogs" go)))
+           (current-renderer))))))
      (tabs
       '(info charts memory threads performance)
       #:choice->label (compose1 string-titlecase symbol->string)
