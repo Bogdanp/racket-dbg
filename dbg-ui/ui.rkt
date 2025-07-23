@@ -13,13 +13,15 @@
           [port 9011])
       (command-line
        #:once-each
-       [("--host" "-H") the-host "the host to connect to (default: 127.0.0.1)"
-                        (set! host the-host)]
-       [("--port" "-P") the-port "the port to connect to (default: 9011)"
-                        (let ([port-number (string->number the-port)])
-                          (unless port-number
-                            (eprintf "error: ~a is not a valid port number~n" the-port))
-                          (set! port port-number))]
+       [("--host" "-H")
+        HOST "the host to connect to (default: 127.0.0.1)"
+        (set! host HOST)]
+       [("--port" "-P")
+        PORT "the port to connect to (default: 9011)"
+        (let ([port-number (string->number PORT)])
+          (unless port-number
+            (eprintf "error: ~a is not a valid port number~n" PORT))
+          (set! port port-number))]
        #:args []
        (values host port))))
 
