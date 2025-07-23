@@ -5,7 +5,19 @@
          "hacks.rkt")
 
 (provide
+ make-mix-window-close
  mix-context-event)
+
+(define (make-mix-window-close)
+  (define close! void)
+  (values
+   (lambda ()
+     (close!))
+   (lambda (%)
+     (class %
+       (inherit show)
+       (super-new)
+       (set! close! (λ () (show #f)))))))
 
 (define ((mix-context-event proc) %)
   (class %
