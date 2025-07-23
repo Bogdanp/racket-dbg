@@ -35,9 +35,23 @@
   (define (len id)
     (hash-ref (hash-ref metadata id) 'len 0))
   (define sorted-objects
-    (sort objects < #:key len))
+    (sort objects > #:key len))
+  (define sorted-links
+    (for/hasheqv ([(id links) (in-hash links)])
+      (values id (sort links > #:key len))))
   (reference-graph
    (hasheq
     'objects sorted-objects
     'metadata metadata
-    'links links)))
+    'links sorted-links)))
+
+(module+ main
+  (require racket/gui/easy
+           racket/runtime-path)
+  (define-runtime-path hogs.rktd "testdata/hogs.rktd")
+  (define hogs (call-with-input-file hogs.rktd read))
+  (render
+   (window
+    #:title "Test"
+    #:size '(800 600)
+    (memory-hogs hogs))))
