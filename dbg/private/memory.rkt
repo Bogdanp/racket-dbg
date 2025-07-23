@@ -55,28 +55,26 @@
   (let loop ([v cust])
     (cond
       [(hash-has-key? seen v) null]
-      [else
+      [(custodian? v)
+       (define total
+         (current-memory-use v))
        (hash-set! seen v #t)
-       (cond
-         [(custodian? v)
-          (define total
-            (current-memory-use v))
-          (if (total . >= . limit)
-              (list
-               (hasheq
-                'id (eq-hash-code v)
-                'kind 'custodian
-                'name (~s v)
-                'total total
-                'children (loop (custodian-managed-list cust super-cust))))
-              null)]
-         [(thread? v)
-          (list
-           (hasheq
-            'id (eq-hash-code v)
-            'kind 'thread
-            'name (~s v)))]
-         [(list? v)
-          (apply append (map loop v))]
-         [else
-          null])])))
+       (if (total . >= . limit)
+           (list
+            (hasheq
+             'id (eq-hash-code v)
+             'kind 'custodian
+             'name (~s v)
+             'total total
+             'children (loop (custodian-managed-list cust super-cust))))
+           null)]
+      [(thread? v)
+       (list
+        (hasheq
+         'id (eq-hash-code v)
+         'kind 'thread
+         'name (~s v)))]
+      [(list? v)
+       (apply append (map loop v))]
+      [else
+       null])))
